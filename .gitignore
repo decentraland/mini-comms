@@ -1,0 +1,12 @@
+dist/
+node_modules/
+**/.DS_Store
+coverage
+
+protoc3
+
+.env
+.catalyst-name
+
+src/controllers/bff-proto/*.ts
+src/controllers/proto/ws.ts
