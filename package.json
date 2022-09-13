@@ -1,5 +1,5 @@
 {
-  "name": "@dcl/explorer-bff",
+  "name": "@dcl/mini-comms",
   "scripts": {
     "build": "make build",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
