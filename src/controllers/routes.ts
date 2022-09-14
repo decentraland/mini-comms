@@ -9,6 +9,7 @@ export async function setupRouter(_: GlobalContext): Promise<Router<GlobalContex
   const router = new Router<GlobalContext>()
 
   router.get('/ping', pingHandler)
+  router.get('/status', statusHandler)
   router.get('/rooms/status', statusHandler)
   router.get('/rooms/:roomId', websocketHandler)
 
