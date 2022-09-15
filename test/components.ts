@@ -6,7 +6,6 @@ import { createRunner, createLocalFetchCompoment } from '@well-known-components/
 import { main } from '../src/service'
 import { TestComponents } from '../src/types'
 import { initComponents as originalInitComponents } from '../src/components'
-import { createLocalNatsComponent } from '@well-known-components/nats-component/dist/test-component'
 import { URL } from 'url'
 import { WebSocket } from 'ws'
 
@@ -45,7 +44,6 @@ async function initComponents(): Promise<TestComponents> {
   return {
     ...components,
     localFetch: await createLocalFetchCompoment(config),
-    nats: await createLocalNatsComponent(),
     createLocalWebSocket: await createTestWsComponent({ config })
   }
 }
