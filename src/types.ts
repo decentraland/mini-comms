@@ -12,16 +12,13 @@ import { RpcServer, RpcServerPort } from '@dcl/rpc'
 import { IRealmComponent } from './adapters/realm'
 import { CatalystContract } from '@dcl/catalyst-contracts'
 import { IStatusComponent } from './adapters/status'
-import {
-  PeerTopicSubscriptionResultElem,
-  SystemTopicSubscriptionResultElem
-} from './controllers/bff-proto/comms-service'
+import { RoomComponent } from './adapters/rooms'
 
 export type GlobalContext = {
   components: BaseComponents
 }
 
-export type RpcContext = GlobalContext & { peer?: RpcSession }
+export type RpcContext = GlobalContext
 
 export type WebSocketComponent = IBaseComponent & {
   ws: WebSocketServer
@@ -40,27 +37,12 @@ export type BaseComponents = {
   contract: CatalystContract
   status: IStatusComponent
 
-  rpcSessions: {
-    sessions: Map<string, RpcSession>
-  }
-}
-
-export type NatsMsg = {
-  subject: string
-  data: Uint8Array
+  rooms: RoomComponent
 }
 
 export type Channel<T> = {
   close: () => void
   [Symbol.asyncIterator]: () => AsyncGenerator<T>
-}
-
-export type RpcSession = {
-  port: RpcServerPort<RpcContext>
-  address: string
-  subscriptionsIndex: number
-  peerSubscriptions: Map<number, Channel<PeerTopicSubscriptionResultElem>>
-  systemSubscriptions: Map<number, Channel<SystemTopicSubscriptionResultElem>>
 }
 
 // components used in runtime

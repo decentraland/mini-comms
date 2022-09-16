@@ -7,11 +7,11 @@ import { createMetricsComponent } from '@well-known-components/metrics'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createWsComponent } from './adapters/ws'
-import { createRpcServer } from '@dcl/rpc'
 import { createRealmComponent } from './adapters/realm'
 import { catalystRegistryForProvider } from '@dcl/catalyst-contracts'
 import { createStatusComponent } from './adapters/status'
 import { observeBuildInfo } from './logic/build-info'
+import { createRoomsComponent } from './adapters/rooms'
 
 const DEFAULT_ETH_NETWORK = 'goerli'
 
@@ -42,7 +42,8 @@ export async function initComponents(): Promise<AppComponents> {
   const contract = await catalystRegistryForProvider(ethereumProvider)
   const realm = await createRealmComponent({ config, logs, fetch, contract })
   const status = await createStatusComponent({ config, logs, fetch })
-
+  const rooms = createRoomsComponent({ logs, metrics })
+  
   await observeBuildInfo({ config, metrics })
 
   return {
@@ -57,8 +58,6 @@ export async function initComponents(): Promise<AppComponents> {
     realm,
     contract,
     status,
-    rpcSessions: {
-      sessions: new Map()
-    }
+    rooms
   }
 }

@@ -1,7 +1,9 @@
 import { IMetricsComponent } from '@well-known-components/interfaces'
 import { validateMetricsDeclaration } from '@well-known-components/metrics'
+import { roomsMetrics } from './adapters/rooms'
 
 export const metricDeclarations = {
+  ...roomsMetrics,
   test_ping_counter: {
     help: 'Count calls to ping',
     type: IMetricsComponent.CounterType,

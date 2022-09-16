@@ -43,15 +43,15 @@ test: build
 test-watch:
 	node_modules/.bin/jest --detectOpenHandles --colors --runInBand --watch $(TESTARGS) --coverage
 
-src/controllers/bff-proto/%.ts: protoc3/bin/protoc src/controllers/bff-proto/%.proto
+src/controllers/proto/ws-comms-rfc-5.ts: protoc3/bin/protoc node_modules/@dcl/protocol/kernel/comms/ws-comms-rfc-5.proto
 	protoc3/bin/protoc \
 		--plugin=./node_modules/.bin/protoc-gen-ts_proto \
 		--ts_proto_opt=esModuleInterop=true,returnObservable=false,outputServices=generic-definitions \
-		--ts_proto_out="$(PWD)/src/controllers/bff-proto" \
-		-I="$(PWD)/src/controllers/bff-proto" \
-		"$(PWD)/src/controllers/bff-proto/$*.proto"
+		--ts_proto_out="$(PWD)/src/controllers/proto" \
+		-I="$(PWD)/node_modules/@dcl/protocol/kernel/comms" \
+		"$(PWD)/node_modules/@dcl/protocol/kernel/comms/ws-comms-rfc-5.proto"
 
-build: ${PBS_TS}
+build: ${PBS_TS} src/controllers/proto/ws-comms-rfc-5.ts
 	@rm -rf dist || true
 	@mkdir -p dist
 	@./node_modules/.bin/tsc -p tsconfig.json
