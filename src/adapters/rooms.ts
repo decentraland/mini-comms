@@ -90,7 +90,7 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
     })
     roomInstance.delete(roomSocket)
     addressToSocket.delete(roomSocket.address)
-    if (roomInstance.size == 0) {
+    if (roomInstance.size === 0) {
       logger.debug('Destroying room', { room: roomSocket.room, count: rooms.size })
       rooms.delete(roomSocket.room)
       observeRoomCount()
@@ -102,7 +102,7 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
 
   // simply sends a message to a socket. disconnects the socket upon failure
   function sendMessage(socket: WebSocket, message: Uint8Array) {
-    if (socket.readyState == socket.OPEN) {
+    if (socket.readyState === socket.OPEN) {
       socket.send(message, (err) => {
         if (err) {
           logger.error(err)

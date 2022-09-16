@@ -22,7 +22,7 @@ export async function websocketHandler(
       logger.debug('Websocket closed')
     })
 
-    handleSocketLinearProtocol(context.components, ws, context.params.roomId).catch(err => {
+    handleSocketLinearProtocol(context.components, ws, context.params.roomId).catch((err) => {
       logger.info(err)
       ws.close()
     })
