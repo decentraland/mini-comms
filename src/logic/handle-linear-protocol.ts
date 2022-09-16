@@ -17,7 +17,7 @@ export async function handleSocketLinearProtocol(
   try {
     // process the messages
     /// 1. the remote client sends their authentication message
-    const { peerIdentification } = await channel.yield(1000)
+    const { peerIdentification } = await channel.yield(1000, 'Timed out waining for peer identification')
 
     if (!peerIdentification) throw new Error('Invalid protocol. peerIdentification packet missed')
     if (!EthAddress.validate(peerIdentification.address))
@@ -42,7 +42,7 @@ export async function handleSocketLinearProtocol(
     })
 
     /// 3. wait for the confirmation message
-    const { signedChallengeForServer } = await channel.yield(1000)
+    const { signedChallengeForServer } = await channel.yield(1000, 'Timed out waiting for signed challenge response')
 
     if (!signedChallengeForServer) {
       throw new Error('Invalid protocol. signedChallengeForServer packet missed')
