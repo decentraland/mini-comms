@@ -1,9 +1,6 @@
 PROTOBUF_VERSION = 3.19.1
 UNAME := $(shell uname)
 
-PROTO_FILES := $(wildcard src/controllers/bff-proto/*.proto)
-PBS_TS = $(PROTO_FILES:src/controllers/bff-proto/%.proto=src/controllers/bff-proto/%.ts)
-
 export PATH := node_modules/.bin:/usr/local/include/:protoc3/bin:$(PATH)
 
 ifneq ($(CI), true)
@@ -51,7 +48,7 @@ src/controllers/proto/ws-comms-rfc-5.ts: protoc3/bin/protoc node_modules/@dcl/pr
 		-I="$(PWD)/node_modules/@dcl/protocol/kernel/comms" \
 		"$(PWD)/node_modules/@dcl/protocol/kernel/comms/ws-comms-rfc-5.proto"
 
-build: ${PBS_TS} src/controllers/proto/ws-comms-rfc-5.ts
+build: src/controllers/proto/ws-comms-rfc-5.ts
 	@rm -rf dist || true
 	@mkdir -p dist
 	@./node_modules/.bin/tsc -p tsconfig.json
