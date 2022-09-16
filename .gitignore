@@ -8,4 +8,4 @@ protoc3
 .env
 .catalyst-name
 
-src/controllers/proto/*.ts
+src/proto/*.ts

@@ -1,5 +1,5 @@
 import { Writer } from 'protobufjs/minimal'
-import * as proto from '../controllers/proto/ws-comms-rfc-5'
+import * as proto from '../proto/ws-comms-rfc-5'
 import { WebSocket } from 'ws'
 import { AppComponents } from '../types'
 import { validateMetricsDeclaration } from '@well-known-components/metrics'

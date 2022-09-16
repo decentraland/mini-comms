@@ -1,9 +1,7 @@
 import { EthAddress } from '@dcl/schemas'
-import { AsyncQueue } from '@dcl/rpc/dist/push-channel'
 import { WebSocket } from 'ws'
 import { craftMessage } from '../adapters/rooms'
 import { AppComponents } from '../types'
-import { WsPacket } from '../controllers/proto/ws-comms-rfc-5'
 import { Authenticator } from '@dcl/crypto'
 import { wsAsAsyncChannel } from './ws-as-async-channel'
 

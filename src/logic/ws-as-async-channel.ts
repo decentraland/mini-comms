@@ -1,6 +1,6 @@
 import { AsyncQueue } from '@dcl/rpc/dist/push-channel'
 import { WebSocket } from 'ws'
-import { WsPacket } from '../controllers/proto/ws-comms-rfc-5'
+import { WsPacket } from '../proto/ws-comms-rfc-5'
 
 export function wsAsAsyncChannel(socket: WebSocket) {
   // Wire the socket to a pushable channel
