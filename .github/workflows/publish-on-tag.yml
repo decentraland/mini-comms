@@ -1,13 +1,22 @@
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - main
 
-name: Publish NPM package
+name: Release and publish NPM package
 jobs:
 
   build-and-test:
     uses: ./.github/workflows/node.yml
+
+  release:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    needs: build-and-test
+    steps:
+      - uses: decentraland/gh-action-release@0.3.4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
     runs-on: ubuntu-latest
@@ -16,7 +25,11 @@ jobs:
     env:
       NODE_AUTH_TOKEN: stub
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@master
+        with:
+          fetch-depth: 0
+      - name: get latest release and export as GIT_TAG
+        run:  echo "GIT_TAG=$(git tag | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | sort -V | tail -1)" > $GITHUB_ENV
       - name: Use Node.js 16.x
         uses: actions/setup-node@v2
         with:
