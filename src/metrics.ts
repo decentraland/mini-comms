@@ -1,8 +1,9 @@
 import { IMetricsComponent } from '@well-known-components/interfaces'
-import { validateMetricsDeclaration } from '@well-known-components/metrics'
+import { getDefaultHttpMetrics, validateMetricsDeclaration } from '@well-known-components/metrics'
 import { roomsMetrics } from './adapters/rooms'
 
 export const metricDeclarations = {
+  ...getDefaultHttpMetrics(),
   ...roomsMetrics,
   test_ping_counter: {
     help: 'Count calls to ping',
