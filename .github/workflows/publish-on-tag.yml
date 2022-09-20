@@ -1,0 +1,37 @@
+on:
+  push:
+    tags:
+      - '*'
+
+name: Publish NPM package
+jobs:
+
+  build-and-test:
+    uses: ./.github/workflows/node.yml
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: ${{ success() }}
+    env:
+      NODE_AUTH_TOKEN: stub
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js 16.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+          cache: npm
+      - name: install
+        run:  make install
+      - name: check code lint
+        run:  make lint
+      - name: build
+        run:  make build
+      - name: Publish
+        uses: menduz/oddish-action@master
+        with:
+          registry-url: "https://registry.npmjs.org"
+          access: public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
