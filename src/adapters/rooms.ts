@@ -113,7 +113,7 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
   }
 
   // broadcasts a message to a room. optionally it can skip one socket
-  function broadcastToRoom(roomSockets: Set<RoomSocket>, message: Uint8Array, excludePeer?: RoomSocket) {
+  function broadcastToRoom(roomSockets: Set<RoomSocket>, message: Uint8Array, excludePeer: RoomSocket) {
     for (const peer of roomSockets) {
       if (peer === excludePeer) continue
       sendMessage(peer.ws, message)
@@ -158,6 +158,8 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
         )
         components.metrics.increment('dcl_ws_rooms_sent_messages_total')
       } else {
+        // we accept unknown messages to enable protocol extensibility and compatibility.
+        // do NOT kick the users when they send unknown messages
         components.metrics.increment('dcl_ws_rooms_unknown_sent_messages_total')
       }
     })
