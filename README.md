@@ -1,4 +1,4 @@
-# Minimum Viable Comms
+# Minimum Viable Comms - Reference implementation of RFC-5
 
 ## Getting Started
 

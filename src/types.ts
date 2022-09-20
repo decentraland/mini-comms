@@ -8,10 +8,7 @@ import type {
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
 import { WebSocket } from 'ws'
-import { RpcServer, RpcServerPort } from '@dcl/rpc'
-import { IRealmComponent } from './adapters/realm'
-import { CatalystContract } from '@dcl/catalyst-contracts'
-import { IStatusComponent } from './adapters/status'
+import { HTTPProvider } from 'eth-connect'
 import { RoomComponent } from './adapters/rooms'
 
 export type GlobalContext = {
@@ -32,11 +29,7 @@ export type BaseComponents = {
   fetch: IFetchComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   ws: WebSocketComponent
-  realm: IRealmComponent
-  ethereumProvider: any
-  contract: CatalystContract
-  status: IStatusComponent
-
+  ethereumProvider: HTTPProvider
   rooms: RoomComponent
 }
 

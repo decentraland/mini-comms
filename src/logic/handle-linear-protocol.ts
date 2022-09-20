@@ -4,6 +4,7 @@ import { craftMessage } from '../adapters/rooms'
 import { AppComponents } from '../types'
 import { Authenticator } from '@dcl/crypto'
 import { wsAsAsyncChannel } from './ws-as-async-channel'
+import { normalizeAddress } from './address'
 
 export async function handleSocketLinearProtocol(
   components: Pick<AppComponents, 'rooms' | 'logs' | 'ethereumProvider'>,
@@ -24,7 +25,7 @@ export async function handleSocketLinearProtocol(
       throw new Error('Invalid protocol. peerIdentification has an invalid address')
 
     const challengeToSign = 'dcl-' + Math.random().toString(36)
-    const alreadyConnected = components.rooms.isAddressConnected(peerIdentification.address.toLowerCase())
+    const alreadyConnected = components.rooms.isAddressConnected(normalizeAddress(peerIdentification.address))
     logger.debug('Generating challenge', {
       challengeToSign,
       address: peerIdentification.address,
@@ -57,7 +58,7 @@ export async function handleSocketLinearProtocol(
     if (result.ok) {
       logger.debug(`Authentication successful`, { address: peerIdentification.address })
 
-      components.rooms.addSocketToRoom(socket, peerIdentification.address.toLowerCase(), room)
+      components.rooms.addSocketToRoom(socket, normalizeAddress(peerIdentification.address), room)
     } else {
       logger.error(`Authentication failed`, { message: result.message } as any)
       throw new Error('Authentication failed')

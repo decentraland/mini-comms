@@ -5,6 +5,7 @@ import { future } from 'fp-future'
 import { WebSocket } from 'ws'
 import { craftMessage } from '../../src/adapters/rooms'
 import { TestComponents } from '../../src/types'
+import { normalizeAddress } from '../../src/logic/address'
 
 test('end to end test', ({ components, spyComponents }) => {
   const aliceIdentity = createEphemeralIdentity('alice')
@@ -64,13 +65,13 @@ test('end to end test', ({ components, spyComponents }) => {
 
     // when bob joins the room, the welcome message contains alice's information
     expect(bob.welcomeMessage.peerIdentities).toEqual({
-      [alice.welcomeMessage.alias]: alice.identity.address.toLowerCase()
+      [alice.welcomeMessage.alias]: normalizeAddress(alice.identity.address)
     })
 
     // when bob connects alice receives peerJoinMessage
     const { peerJoinMessage } = await alice.channel.yield(1000, 'when bob connects alice receives peerJoinMessage')
     expect(peerJoinMessage).not.toBeUndefined()
-    expect(peerJoinMessage.address).toEqual(bob.identity.address.toLowerCase())
+    expect(peerJoinMessage.address).toEqual(normalizeAddress(bob.identity.address))
     expect(peerJoinMessage.alias).toEqual(bob.welcomeMessage.alias)
 
     {
@@ -104,8 +105,8 @@ test('end to end test', ({ components, spyComponents }) => {
       {
         // clohe receives welcome with bob and alice
         expect(clohe.welcomeMessage.peerIdentities).toEqual({
-          [alice.welcomeMessage.alias]: alice.identity.address.toLowerCase(),
-          [bob.welcomeMessage.alias]: bob.identity.address.toLowerCase()
+          [alice.welcomeMessage.alias]: normalizeAddress(alice.identity.address),
+          [bob.welcomeMessage.alias]: normalizeAddress(bob.identity.address)
         })
       }
 
@@ -113,7 +114,7 @@ test('end to end test', ({ components, spyComponents }) => {
         // alice receives peerJoinMessage
         const { peerJoinMessage } = await alice.channel.yield(1000, 'alice receives peerJoinMessage')
         expect(peerJoinMessage).not.toBeUndefined()
-        expect(peerJoinMessage.address).toEqual(clohe.identity.address.toLowerCase())
+        expect(peerJoinMessage.address).toEqual(normalizeAddress(clohe.identity.address))
         expect(peerJoinMessage.alias).toEqual(clohe.welcomeMessage.alias)
       }
 
@@ -121,7 +122,7 @@ test('end to end test', ({ components, spyComponents }) => {
         // bob receives peerJoinMessage
         const { peerJoinMessage } = await bob.channel.yield(1000, 'bob receives peerJoinMessage')
         expect(peerJoinMessage).not.toBeUndefined()
-        expect(peerJoinMessage.address).toEqual(clohe.identity.address.toLowerCase())
+        expect(peerJoinMessage.address).toEqual(normalizeAddress(clohe.identity.address))
         expect(peerJoinMessage.alias).toEqual(clohe.welcomeMessage.alias)
       }
       {

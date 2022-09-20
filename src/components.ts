@@ -7,9 +7,6 @@ import { createMetricsComponent } from '@well-known-components/metrics'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createWsComponent } from './adapters/ws'
-import { createRealmComponent } from './adapters/realm'
-import { catalystRegistryForProvider } from '@dcl/catalyst-contracts'
-import { createStatusComponent } from './adapters/status'
 import { observeBuildInfo } from './logic/build-info'
 import { createRoomsComponent } from './adapters/rooms'
 
@@ -39,9 +36,6 @@ export async function initComponents(): Promise<AppComponents> {
     { fetch: fetch.fetch }
   )
 
-  const contract = await catalystRegistryForProvider(ethereumProvider)
-  const realm = await createRealmComponent({ config, logs, fetch, contract })
-  const status = await createStatusComponent({ config, logs, fetch })
   const rooms = createRoomsComponent({ logs, metrics })
 
   await observeBuildInfo({ config, metrics })
@@ -55,9 +49,6 @@ export async function initComponents(): Promise<AppComponents> {
     metrics,
     ws,
     ethereumProvider,
-    realm,
-    contract,
-    status,
     rooms
   }
 }
