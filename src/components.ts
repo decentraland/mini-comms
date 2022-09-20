@@ -30,7 +30,7 @@ export async function initComponents(): Promise<AppComponents> {
   )
   const statusChecks = await createStatusCheckComponent({ server, config })
   const fetch = await createFetchComponent()
-  const metrics = await createMetricsComponent(metricDeclarations, { server, config })
+  const metrics = await createMetricsComponent(metricDeclarations, { config })
   const ethereumProvider = new HTTPProvider(
     `https://rpc.decentraland.org/${encodeURIComponent(ethNetwork)}?project=mini-comms`,
     { fetch: fetch.fetch }
