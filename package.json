@@ -32,7 +32,7 @@
     "@dcl/crypto": "^3.1.1",
     "@dcl/protocol": "^1.0.0-3070738382.commit-8ad38d9",
     "@dcl/rpc": "^1.0.2",
-    "@dcl/schemas": "^5.10.0",
+    "@dcl/schemas": "^5.17.1",
     "@types/google-protobuf": "^3.15.6",
     "@types/ws": "^8.5.3",
     "@well-known-components/env-config-provider": "^1.1.1",
