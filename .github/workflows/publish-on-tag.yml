@@ -23,7 +23,7 @@ jobs:
       - name: check code lint
         run:  make lint
       - name: build
-        run:  make build
+        run:  make build test
       - name: Publish
         uses: menduz/oddish-action@master
         with:
