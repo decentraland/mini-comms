@@ -3,7 +3,7 @@ import { createDotEnvConfigComponent } from '@well-known-components/env-config-p
 import { createServerComponent, createStatusCheckComponent } from '@well-known-components/http-server'
 import { createLogComponent } from '@well-known-components/logger'
 import { createFetchComponent } from './adapters/fetch'
-import { createMetricsComponent } from '@well-known-components/metrics'
+import { createMetricsComponent, instrumentHttpServerWithMetrics } from '@well-known-components/metrics'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
 import { createWsComponent } from './adapters/ws'
@@ -39,6 +39,8 @@ export async function initComponents(): Promise<AppComponents> {
   const rooms = createRoomsComponent({ logs, metrics })
 
   await observeBuildInfo({ config, metrics })
+
+  await instrumentHttpServerWithMetrics({ metrics, config, server })
 
   return {
     config,
