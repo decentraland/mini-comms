@@ -1,5 +1,6 @@
 {
   "name": "@dcl/mini-comms",
+  "version": "0.0.0",
   "scripts": {
     "build": "make build",
     "start": "node --trace-warnings --abort-on-uncaught-exception --unhandled-rejections=strict dist/index.js",
@@ -47,5 +48,6 @@
     "protoc-gen-dcl": "^1.0.0-20220109214200.commit-f45e34a",
     "ts-proto": "^1.117.0",
     "ws": "^8.8.1"
-  }
+  },
+  "files": ["dist"]
 }
