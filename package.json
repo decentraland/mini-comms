@@ -31,7 +31,7 @@
   "dependencies": {
     "@dcl/catalyst-contracts": "^3.0.0",
     "@dcl/crypto": "^3.2.1",
-    "@dcl/protocol": "^1.0.0-3146779852.commit-e3c1df0",
+    "@dcl/protocol": "https://sdk-team-cdn.decentraland.org/@dcl/protocol/branch//dcl-protocol-1.0.0-3146783658.commit-c506a2a.tgz",
     "@dcl/rpc": "^1.0.2",
     "@dcl/schemas": "^5.17.1",
     "@types/google-protobuf": "^3.15.6",
