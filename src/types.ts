@@ -23,7 +23,6 @@ export type WebSocketComponent = IBaseComponent & {}
 export type BaseComponents = {
   config: IConfigComponent
   logs: ILoggerComponent
-  server: IHttpServerComponent<GlobalContext>
   fetch: IFetchComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
   ethereumProvider: HTTPProvider
@@ -36,9 +35,7 @@ export type Channel<T> = {
 }
 
 // components used in runtime
-export type AppComponents = BaseComponents & {
-  statusChecks: IBaseComponent
-}
+export type AppComponents = BaseComponents & {}
 
 // components used in tests
 export type TestComponents = BaseComponents & {

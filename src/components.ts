@@ -18,15 +18,6 @@ export async function initComponents(): Promise<AppComponents> {
   const ethNetwork = (await config.getString('ETH_NETWORK')) ?? DEFAULT_ETH_NETWORK
 
   const logs = await createLogComponent({})
-  const server = await createServerComponent<GlobalContext>(
-    { config, logs },
-    {
-      cors: {
-        maxAge: 36000
-      }
-    }
-  )
-  const statusChecks = await createStatusCheckComponent({ server, config })
   const fetch = await createFetchComponent()
   const metrics = await createMetricsComponent(metricDeclarations, { config })
   const ethereumProvider = new HTTPProvider(
@@ -38,13 +29,9 @@ export async function initComponents(): Promise<AppComponents> {
 
   await observeBuildInfo({ config, metrics })
 
-  await instrumentHttpServerWithMetrics({ metrics, config, server })
-
   return {
     config,
     logs,
-    server,
-    statusChecks,
     fetch,
     metrics,
     ethereumProvider,
