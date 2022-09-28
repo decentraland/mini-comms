@@ -76,7 +76,7 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // alice sends a message that needs to reach bob
-      await socketSend(alice, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]) } }))
+      await socketSend(alice, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]), unreliable: false } }))
       const { peerUpdateMessage } = await bob.channel.yield(1000, 'alice awaits message from bob')
       expect(peerUpdateMessage).not.toBeUndefined()
       expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([1, 2, 3]))
@@ -91,7 +91,7 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // bob sends a message that needs to reach alice
-      await socketSend(bob, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]) } }))
+      await socketSend(bob, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]), unreliable: false } }))
       const { peerUpdateMessage } = await alice.channel.yield(1000, 'alice awaits message from bob')
       expect(peerUpdateMessage).not.toBeUndefined()
       expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([3, 2, 3]))
@@ -127,7 +127,7 @@ test('end to end test', ({ components, spyComponents }) => {
       }
       {
         // then send a message
-        await socketSend(clohe, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]) } }))
+        await socketSend(clohe, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]), unreliable: false } }))
 
         {
           // alice receives update
