@@ -43,11 +43,14 @@
     "@well-known-components/metrics": "^2.0.0",
     "@well-known-components/nats-component": "^2.0.0",
     "@well-known-components/pushable-channel": "^1.0.1",
+    "bufferutil": "^4.0.6",
     "google-protobuf": "^3.20.1",
     "mitt": "^3.0.0",
     "protoc-gen-dcl": "^1.0.0-20220109214200.commit-f45e34a",
     "ts-proto": "^1.117.0",
     "ws": "^8.8.1"
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ]
 }
