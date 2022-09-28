@@ -56,6 +56,14 @@ build: src/proto/ws-comms-rfc-5.ts
 start: build
 	npm start
 
+profile: build
+	node \
+		--trace-warnings \
+		--abort-on-uncaught-exception \
+		--unhandled-rejections=strict \
+		--inspect \
+		dist/index.js
+
 lint:
 	@node_modules/.bin/eslint . --ext .ts
 
