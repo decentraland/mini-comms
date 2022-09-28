@@ -1,5 +1,5 @@
 import { AsyncQueue } from '@dcl/rpc/dist/push-channel'
-import { WebSocket } from 'ws'
+import { WebSocket } from 'uWebSockets.js'
 import { WsPacket } from '../proto/ws-comms-rfc-5'
 
 export function wsAsAsyncChannel(socket: WebSocket) {
@@ -15,7 +15,7 @@ export function wsAsAsyncChannel(socket: WebSocket) {
       channel.enqueue(WsPacket.decode(data))
     } catch (error) {
       socket.emit('error', error)
-      socket.terminate()
+      socket.close()
     }
   }
   function closeChannel() {

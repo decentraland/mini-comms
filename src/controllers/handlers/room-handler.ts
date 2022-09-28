@@ -1,5 +1,5 @@
 import { upgradeWebSocketResponse } from '@well-known-components/http-server/dist/ws'
-import { WebSocket } from 'ws'
+import { WebSocket } from 'uWebSockets.js'
 import { handleSocketLinearProtocol } from '../../logic/handle-linear-protocol'
 import { HandlerContextWithPath } from '../../types'
 
@@ -17,14 +17,14 @@ export async function websocketHandler(
     // and we leverage that performance and reduced allocations footprint
     ws.binaryType = 'nodebuffer'
 
-    ws.on('error', (error) => {
-      logger.error(error)
-      ws.close()
-    })
+    // ws.on('error', (error) => {
+    //   logger.error(error)
+    //   ws.close()
+    // })
 
-    ws.on('close', () => {
-      logger.debug('Websocket closed')
-    })
+    // ws.on('close', () => {
+    //   logger.debug('Websocket closed')
+    // })
 
     handleSocketLinearProtocol(context.components, ws, context.params.roomId).catch((err) => {
       logger.info(err)

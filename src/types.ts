@@ -1,4 +1,4 @@
-import type { IFetchComponent, WebSocketServer } from '@well-known-components/http-server'
+import type { IFetchComponent } from '@well-known-components/http-server'
 import type {
   IConfigComponent,
   ILoggerComponent,
@@ -7,9 +7,9 @@ import type {
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
-import { WebSocket } from 'ws'
 import { HTTPProvider } from 'eth-connect'
 import { RoomComponent } from './adapters/rooms'
+import { WebSocket } from 'uWebSockets.js'
 
 export type GlobalContext = {
   components: BaseComponents
@@ -17,9 +17,7 @@ export type GlobalContext = {
 
 export type RpcContext = GlobalContext
 
-export type WebSocketComponent = IBaseComponent & {
-  ws: WebSocketServer
-}
+export type WebSocketComponent = IBaseComponent & {}
 
 // components used in every environment
 export type BaseComponents = {
@@ -28,7 +26,6 @@ export type BaseComponents = {
   server: IHttpServerComponent<GlobalContext>
   fetch: IFetchComponent
   metrics: IMetricsComponent<keyof typeof metricDeclarations>
-  ws: WebSocketComponent
   ethereumProvider: HTTPProvider
   rooms: RoomComponent
 }

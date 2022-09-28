@@ -1,10 +1,10 @@
 import { EthAddress } from '@dcl/schemas'
-import { WebSocket } from 'ws'
 import { craftMessage } from '../adapters/rooms'
 import { AppComponents } from '../types'
 import { Authenticator } from '@dcl/crypto'
 import { wsAsAsyncChannel } from './ws-as-async-channel'
 import { normalizeAddress } from './address'
+import { WebSocket } from 'uWebSockets.js'
 
 export async function handleSocketLinearProtocol(
   components: Pick<AppComponents, 'rooms' | 'logs' | 'ethereumProvider'>,
@@ -15,15 +15,15 @@ export async function handleSocketLinearProtocol(
   // Wire the socket to a pushable channel
   const channel = wsAsAsyncChannel(socket)
 
-  if (socket.readyState !== socket.OPEN) {
-    await new Promise<void>((res, rej) => {
-      socket.on('open', res)
-      socket.on('error', rej)
-      setTimeout(() => {
-        rej(new Error('TIME OUT: Socket not connected'))
-      }, 3000)
-    })
-  }
+  // if (socket.readyState !== socket.OPEN) {
+  //   await new Promise<void>((res, rej) => {
+  //     socket.on('open', res)
+  //     socket.on('error', rej)
+  //     setTimeout(() => {
+  //       rej(new Error('TIME OUT: Socket not connected'))
+  //     }, 3000)
+  //   })
+  // }
 
   try {
     // process the messages
@@ -43,14 +43,11 @@ export async function handleSocketLinearProtocol(
     })
 
     /// 2. send the challenge back to the client
-    socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }), (err) => {
-      if (err) {
-        logger.error(err)
-        console.error(err)
-        socket.terminate()
-        channel.close()
-      }
-    })
+    if (socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } })) !== 1) {
+      logger.error('cannot send challenge')
+      socket.close()
+      channel.close()
+    }
 
     /// 3. wait for the confirmation message
     const { signedChallengeForServer } = await channel.yield(1000, 'Timed out waiting for signed challenge response')

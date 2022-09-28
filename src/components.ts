@@ -6,7 +6,6 @@ import { createFetchComponent } from './adapters/fetch'
 import { createMetricsComponent, instrumentHttpServerWithMetrics } from '@well-known-components/metrics'
 import { AppComponents, GlobalContext } from './types'
 import { metricDeclarations } from './metrics'
-import { createWsComponent } from './adapters/ws'
 import { observeBuildInfo } from './logic/build-info'
 import { createRoomsComponent } from './adapters/rooms'
 
@@ -19,9 +18,8 @@ export async function initComponents(): Promise<AppComponents> {
   const ethNetwork = (await config.getString('ETH_NETWORK')) ?? DEFAULT_ETH_NETWORK
 
   const logs = await createLogComponent({})
-  const ws = await createWsComponent({ logs })
   const server = await createServerComponent<GlobalContext>(
-    { config, logs, ws: ws.ws },
+    { config, logs },
     {
       cors: {
         maxAge: 36000
@@ -49,7 +47,6 @@ export async function initComponents(): Promise<AppComponents> {
     statusChecks,
     fetch,
     metrics,
-    ws,
     ethereumProvider,
     rooms
   }
