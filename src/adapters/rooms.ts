@@ -40,6 +40,10 @@ export const roomsMetrics = validateMetricsDeclaration({
   dcl_ws_rooms_unknown_sent_messages_total: {
     help: 'Total amount of unkown messages',
     type: 'counter'
+  },
+  dcl_ws_rooms_dropped_unreliable_messages_total: {
+    help: 'Total amount of dropped unreliable messages',
+    type: 'counter'
   }
 })
 
@@ -51,10 +55,13 @@ export function craftMessage(packet: Partial<proto.WsPacket>): Uint8Array {
   return writer.finish()
 }
 
-export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'metrics'>): RoomComponent {
+export async function createRoomsComponent(
+  components: Pick<AppComponents, 'logs' | 'metrics' | 'config'>
+): Promise<RoomComponent> {
   const rooms = new Map<string, Set<RoomSocket>>()
   const addressToSocket = new Map<string, RoomSocket>()
   const logger = components.logs.getLogger('RoomsComponent')
+  const unreliableThreshold = (await components.config.getNumber('WS_MAX_BUFFERED_AMOUNT')) || 0
 
   let connectionCounter = 0
 
@@ -95,28 +102,38 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
       rooms.delete(roomSocket.room)
       observeRoomCount()
     } else {
-      broadcastToRoom(roomInstance, craftMessage({ peerLeaveMessage: { alias: roomSocket.alias } }), roomSocket)
+      broadcastToRoom(roomInstance, craftMessage({ peerLeaveMessage: { alias: roomSocket.alias } }), roomSocket, true)
     }
     observeConnectionCount()
   }
 
   // simply sends a message to a socket. disconnects the socket upon failure
-  function sendMessage(socket: WebSocket, message: Uint8Array) {
+  function sendMessage(socket: WebSocket, message: Uint8Array, reliable: boolean) {
     if (socket.readyState === socket.OPEN) {
-      socket.send(message, (err) => {
-        if (err) {
-          logger.error(err)
-          socket.terminate()
-        }
-      })
+      if (socket.bufferedAmount <= unreliableThreshold || reliable) {
+        socket.send(message, (err) => {
+          if (err) {
+            logger.error(err)
+            socket.terminate()
+          }
+        })
+      } else {
+        console.log('dropping message', socket.bufferedAmount)
+        components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
+      }
     }
   }
 
   // broadcasts a message to a room. optionally it can skip one socket
-  function broadcastToRoom(roomSockets: Set<RoomSocket>, message: Uint8Array, excludePeer: RoomSocket) {
+  function broadcastToRoom(
+    roomSockets: Set<RoomSocket>,
+    message: Uint8Array,
+    excludePeer: RoomSocket,
+    reliable: boolean
+  ) {
     for (const peer of roomSockets) {
       if (peer === excludePeer) continue
-      sendMessage(peer.ws, message)
+      sendMessage(peer.ws, message, reliable)
     }
   }
 
@@ -136,7 +153,7 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
 
     if (kicked) {
       logger.info('Kicking user', { room, address, alias: kicked.alias })
-      sendMessage(kicked.ws, craftMessage({ peerKicked: {} }))
+      sendMessage(kicked.ws, craftMessage({ peerKicked: {} }), true)
       kicked.ws.close()
       removeFromRoom(kicked)
       logger.info('Kicked user', { room, address, alias: kicked.alias })
@@ -153,8 +170,15 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
       if (peerUpdateMessage) {
         broadcastToRoom(
           roomInstance,
-          craftMessage({ peerUpdateMessage: { fromAlias: newRoomSocket.alias, body: peerUpdateMessage.body } }),
-          newRoomSocket
+          craftMessage({
+            peerUpdateMessage: {
+              fromAlias: newRoomSocket.alias,
+              body: peerUpdateMessage.body,
+              unreliable: peerUpdateMessage.unreliable
+            }
+          }),
+          newRoomSocket,
+          !peerUpdateMessage.unreliable
         )
         components.metrics.increment('dcl_ws_rooms_sent_messages_total')
       } else {
@@ -175,13 +199,13 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
       }
     }
     const welcomeMessage = craftMessage({ welcomeMessage: { alias: newRoomSocket.alias, peerIdentities } })
-    sendMessage(ws, welcomeMessage)
+    sendMessage(ws, welcomeMessage, true)
 
     // 2. broadcast to all room that this user is joining them
     const joinedMessage = craftMessage({
       peerJoinMessage: { alias: newRoomSocket.alias, address: newRoomSocket.address }
     })
-    broadcastToRoom(roomInstance, joinedMessage, newRoomSocket)
+    broadcastToRoom(roomInstance, joinedMessage, newRoomSocket, true)
 
     components.metrics.increment('dcl_ws_rooms_connections_total')
   }

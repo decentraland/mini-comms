@@ -36,7 +36,7 @@ export async function initComponents(): Promise<AppComponents> {
     { fetch: fetch.fetch }
   )
 
-  const rooms = createRoomsComponent({ logs, metrics })
+  const rooms = await createRoomsComponent({ logs, metrics, config })
 
   await observeBuildInfo({ config, metrics })
 

@@ -42,6 +42,7 @@ export async function handleSocketLinearProtocol(
       alreadyConnected: alreadyConnected + ''
     })
 
+    if (socket.readyState !== socket.OPEN) throw new Error('Connection lost')
     /// 2. send the challenge back to the client
     socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }), (err) => {
       if (err) {
