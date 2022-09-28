@@ -118,7 +118,6 @@ export async function createRoomsComponent(
           }
         })
       } else {
-        console.log('dropping message', socket.bufferedAmount)
         components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
       }
     }
