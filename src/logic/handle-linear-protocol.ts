@@ -15,6 +15,16 @@ export async function handleSocketLinearProtocol(
   // Wire the socket to a pushable channel
   const channel = wsAsAsyncChannel(socket)
 
+  if (socket.readyState !== socket.OPEN) {
+    await new Promise<void>((res, rej) => {
+      socket.on('open', res)
+      socket.on('error', rej)
+      setTimeout(() => {
+        rej(new Error('TIME OUT: Socket not connected'))
+      }, 3000)
+    })
+  }
+
   try {
     // process the messages
     /// 1. the remote client sends their authentication message
@@ -37,7 +47,7 @@ export async function handleSocketLinearProtocol(
       if (err) {
         logger.error(err)
         console.error(err)
-        socket.close()
+        socket.terminate()
         channel.close()
       }
     })

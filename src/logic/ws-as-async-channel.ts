@@ -15,7 +15,7 @@ export function wsAsAsyncChannel(socket: WebSocket) {
       channel.enqueue(WsPacket.decode(data))
     } catch (error) {
       socket.emit('error', error)
-      socket.close()
+      socket.terminate()
     }
   }
   function closeChannel() {

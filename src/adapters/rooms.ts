@@ -106,7 +106,7 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
       socket.send(message, (err) => {
         if (err) {
           logger.error(err)
-          socket.close()
+          socket.terminate()
         }
       })
     }
