@@ -13,6 +13,10 @@ export async function websocketHandler(
     // TODO fix ws types
     const ws = socket as any as WebSocket
 
+    // We use nodebuffer because it removes an extra cast in the ws library
+    // and we leverage that performance and reduced allocations footprint
+    ws.binaryType = 'nodebuffer'
+
     ws.on('error', (error) => {
       logger.error(error)
       ws.close()
