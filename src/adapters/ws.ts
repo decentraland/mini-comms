@@ -12,7 +12,7 @@ export async function createWsComponent(_: Pick<BaseComponents, 'logs'>): Promis
   async function start() {
     if (wss) return
 
-    wss = new WebSocketServer({ noServer: true })
+    wss = new WebSocketServer({ noServer: true, skipUTF8Validation: true })
   }
 
   async function stop() {
