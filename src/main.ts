@@ -20,7 +20,7 @@ enum Stage {
   READY
 }
 
-type ByStage =
+type StatusByStage =
   | {
       stage: Stage.CHALLENGE_SENT | Stage.READY
       challengeToSign: string
@@ -28,16 +28,16 @@ type ByStage =
     }
   | { stage: Stage.INITIAL; challengeToSign?: string; address?: string }
 
-type RoomSocket = {
+type WebSocket = uWS.WebSocket & {
   roomId: string
   alias: number
-} & ByStage
+} & StatusByStage
 
 let connectionCounter = 0
 
 export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvider'>) {
   const logger = components.logs.getLogger('uwebsocket test')
-  const status = new Map<uWS.WebSocket, RoomSocket>()
+  const rooms = new Map<string, Set<WebSocket>>()
   const app = uWS
     .App({})
     .ws('/rooms/:roomId', {
@@ -58,33 +58,28 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
         )
       },
       open: (ws) => {
-        const roomId: string = ws['roomId']
-
-        const alias = ++connectionCounter
-        status.set(ws, { stage: Stage.INITIAL, roomId, alias })
+        ws.stage = Stage.INITIAL
+        ws.alias = ++connectionCounter
       },
-      message: (ws, message, isBinary) => {
+      message: (_ws, message, isBinary) => {
         if (!isBinary) {
           logger.log('protocol error: data is not binary')
           return
         }
-        const peerStatus = status.get(ws)
-        if (!peerStatus) {
-          logger.log('error: no status')
-          return
-        }
+
+        const ws = _ws as any as WebSocket
 
         const changeStage = (toStage: Stage) => {
           logger.debug('Stage changed', {
-            address: peerStatus.address!,
-            from: Stage[peerStatus.stage],
+            address: ws.address!,
+            from: Stage[ws.stage],
             to: Stage[toStage]
           })
-          peerStatus.stage = toStage
+          ws.stage = toStage
         }
 
         const packet = WsPacket.decode(new Uint8Array(message))
-        switch (peerStatus.stage) {
+        switch (ws.stage) {
           case Stage.INITIAL: {
             if (!packet.peerIdentification) {
               logger.debug('Closing connection. Expecting peer identification')
@@ -92,18 +87,18 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
               return
             }
 
-            peerStatus.challengeToSign = 'dcl-' + Math.random().toString(36)
-            peerStatus.address = normalizeAddress(packet.peerIdentification.address)
+            ws.challengeToSign = 'dcl-' + Math.random().toString(36)
+            ws.address = normalizeAddress(packet.peerIdentification.address)
 
             logger.debug('Generating challenge', {
-              challengeToSign: peerStatus.challengeToSign,
-              address: peerStatus.address
+              challengeToSign: ws.challengeToSign,
+              address: ws.address
             })
             const sendResult = ws.send(
               craftMessage({
                 challengeMessage: {
                   alreadyConnected: false,
-                  challengeToSign: peerStatus.challengeToSign
+                  challengeToSign: ws.challengeToSign
                 }
               }),
               true
@@ -125,35 +120,35 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
             }
 
             Authenticator.validateSignature(
-              peerStatus.challengeToSign,
+              ws.challengeToSign,
               JSON.parse(packet.signedChallengeForServer.authChainJson),
               components.ethereumProvider
             )
               .then((result) => {
                 if (result.ok) {
-                  logger.debug(`Authentication successful`, { address: peerStatus.address })
+                  logger.debug(`Authentication successful`, { address: ws.address })
 
                   const peerIdentities: Record<number, string> = {}
-                  for (const peer of status.values()) {
-                    if (
-                      peer.address !== peerStatus.address &&
-                      peer.roomId === peerStatus.roomId &&
-                      peer.stage === Stage.READY
-                    ) {
-                      peerIdentities[peer.alias] = peer.address
+                  const roomWss = rooms.get(ws.roomId) || new Set<WebSocket>()
+                  for (const peerWs of roomWss) {
+                    if (peerWs.stage === Stage.READY) {
+                      peerIdentities[peerWs.alias] = ws.address
                     }
                   }
                   const welcomeMessage = craftMessage({
-                    welcomeMessage: { alias: peerStatus.alias, peerIdentities }
+                    welcomeMessage: { alias: ws.alias, peerIdentities }
                   })
                   ws.send(welcomeMessage, true)
 
                   // 2. broadcast to all room that this user is joining them
                   const joinedMessage = craftMessage({
-                    peerJoinMessage: { alias: peerStatus.alias, address: peerStatus.address }
+                    peerJoinMessage: { alias: ws.alias, address: ws.address }
                   })
-                  ws.subscribe(peerStatus.roomId)
-                  ws.publish(peerStatus.roomId, joinedMessage, true)
+                  ws.subscribe(ws.roomId)
+                  ws.publish(ws.roomId, joinedMessage, true)
+
+                  roomWss.add(ws)
+                  rooms.set(ws.roomId, roomWss)
 
                   changeStage(Stage.READY)
                 } else {
@@ -170,11 +165,6 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
             break
           }
           case Stage.READY: {
-            const peerStatus = status.get(ws)
-            if (!peerStatus) {
-              return
-            }
-
             if (!packet.peerUpdateMessage) {
               // we accept unknown messages to enable protocol extensibility and compatibility.
               // do NOT kick the users when they send unknown messages
@@ -182,26 +172,31 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
               return
             }
 
-            if (!peerStatus.alias) {
+            if (!ws.alias) {
               logger.error('Missing alias but stage is ready')
               return
             }
 
-            packet.peerUpdateMessage.fromAlias = peerStatus.alias
-            ws.publish(peerStatus.roomId, craftMessage({ peerUpdateMessage: packet.peerUpdateMessage }), true)
+            packet.peerUpdateMessage.fromAlias = ws.alias
+            ws.publish(ws.roomId, craftMessage({ peerUpdateMessage: packet.peerUpdateMessage }), true)
 
             break
           }
         }
       },
-      close: (ws) => {
+      close: (_ws) => {
         logger.log('WS closed')
-        const peerStatus = status.get(ws)
-        if (!peerStatus) {
-          return
+
+        const ws = _ws as any as WebSocket
+        let roomsPeer = rooms.get(ws.roomId)
+        if (roomsPeer) {
+          roomsPeer.delete(ws)
+
+          if (roomsPeer.size === 0) {
+            rooms.delete(ws.roomId)
+          }
         }
-        status.delete(ws)
-        app.publish(peerStatus.roomId, craftMessage({ peerLeaveMessage: { alias: peerStatus.alias } }), true)
+        app.publish(ws.roomId, craftMessage({ peerLeaveMessage: { alias: ws.alias } }), true)
       }
     })
     .listen(port, (token) => {
