@@ -20,27 +20,39 @@ enum Stage {
   READY
 }
 
-export function runTest(components: Pick<AppComponents, 'rooms' | 'logs' | 'ethereumProvider'>) {
-  const roomId = '1'
+type RoomSocket = {
+  stage: Stage
+  challengeToSign?: string
+  address?: string
+  roomId: string
+  alias: number
+}
+
+let connectionCounter = 0
+
+export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvider'>) {
   const logger = components.logs.getLogger('uwebsocket test')
-  const status = new Map<uWS.WebSocket, { stage: Stage; challengeToSign?: string; address?: string }>()
+  const status = new Map<uWS.WebSocket, RoomSocket>()
   uWS
     .App({})
     .ws('/rooms/:roomId', {
+      compression: uWS.DISABLED,
       open: (ws) => {
         // const roomId = req.getParameter(0)
-        console.log('A WebSocket connected!')
+        logger.log('A WebSocket connected!')
 
-        status.set(ws, { stage: Stage.INITIAL })
+        const alias = ++connectionCounter
+        const roomId = '1'
+        status.set(ws, { stage: Stage.INITIAL, roomId, alias })
       },
       message: (ws, message, isBinary) => {
         if (!isBinary) {
-          console.log('protocol error: data is not binary')
+          logger.log('protocol error: data is not binary')
           return
         }
         const peerStatus = status.get(ws)
         if (!peerStatus) {
-          console.log('error: no status')
+          logger.log('error: no status')
           return
         }
 
@@ -48,8 +60,8 @@ export function runTest(components: Pick<AppComponents, 'rooms' | 'logs' | 'ethe
         switch (peerStatus.stage) {
           case Stage.INITIAL: {
             if (!packet.peerIdentification) {
-              ws.close()
               logger.debug('Closing connection. Expecting peer identification')
+              ws.close()
               return
             }
 
@@ -70,7 +82,7 @@ export function runTest(components: Pick<AppComponents, 'rooms' | 'logs' | 'ethe
               true
             )
             if (sendResult !== 1) {
-              logger.error('cannot send challenge')
+              logger.debug('Closing connection. Failed to send a challenge')
               ws.close()
             }
 
@@ -82,8 +94,8 @@ export function runTest(components: Pick<AppComponents, 'rooms' | 'logs' | 'ethe
           }
           case Stage.CHALLENGE_SENT: {
             if (!packet.signedChallengeForServer) {
+              logger.debug('Closing connection. Signed chaallenge expected')
               ws.close()
-              logger.debug('Closing connection. Expecting signed challenge')
               return
             }
 
@@ -96,17 +108,40 @@ export function runTest(components: Pick<AppComponents, 'rooms' | 'logs' | 'ethe
                 if (result.ok) {
                   logger.debug(`Authentication successful`, { address: peerStatus.address! })
 
+                  const peerIdentities: Record<number, string> = {}
+                  for (const peer of status.values()) {
+                    if (
+                      peer.address !== peerStatus.address &&
+                      peer.roomId === peerStatus.roomId &&
+                      peer.address &&
+                      peer.stage === Stage.READY
+                    ) {
+                      peerIdentities[peer.alias] = peer.address
+                    }
+                  }
+                  const welcomeMessage = craftMessage({
+                    welcomeMessage: { alias: peerStatus.alias, peerIdentities }
+                  })
+                  ws.send(welcomeMessage, true)
+
+                  // 2. broadcast to all room that this user is joining them
+                  const joinedMessage = craftMessage({
+                    peerJoinMessage: { alias: peerStatus.alias, address: peerStatus.address! }
+                  })
+                  ws.publish(peerStatus.roomId, joinedMessage, true)
+                  ws.subscribe(peerStatus.roomId)
+
                   peerStatus.stage = Stage.READY
                   logger.debug('Stage changed', {
                     stage: peerStatus.stage
                   })
-                  components.rooms.addSocketToRoom(ws, peerStatus.address!, roomId)
                 } else {
                   logger.error(`Authentication failed`, { message: result.message } as any)
                   ws.close()
                 }
               })
               .catch((err) => {
+                logger.debug('Authenticator errr')
                 logger.error(err)
                 ws.close()
               })
@@ -125,25 +160,35 @@ export function runTest(components: Pick<AppComponents, 'rooms' | 'logs' | 'ethe
               // components.metrics.increment('dcl_ws_rooms_unknown_sent_messages_total')
               return
             }
-            components.rooms.onMessage(peerStatus.address!, packet.peerUpdateMessage)
+
+            if (!peerStatus.alias) {
+              logger.error('Missing alias but stage is ready')
+              return
+            }
+
+            packet.peerUpdateMessage.fromAlias = peerStatus.alias
+            ws.publish(peerStatus.roomId, craftMessage({ peerUpdateMessage: packet.peerUpdateMessage }), true)
+
             break
           }
         }
       },
       close: (ws) => {
-        console.log('WS closed')
+        logger.log('WS closed')
         const peerStatus = status.get(ws)
         if (!peerStatus) {
           return
         }
-        components.rooms.onClose(peerStatus.address!)
+        status.delete(ws)
+        // ws.unsubscribe(peerStatus.roomId)
+        // ws.publish(peerStatus.roomId, craftMessage({ peerLeaveMessage: { alias: peerStatus.alias } }), true)
       }
     })
     .listen(port, (token) => {
       if (token) {
-        console.log('Listening to port ' + port)
+        logger.log('Listening to port ' + port)
       } else {
-        console.log('Failed to listen to port ' + port)
+        logger.log('Failed to listen to port ' + port)
       }
     })
 }
