@@ -110,13 +110,18 @@ export async function createRoomsComponent(
   // simply sends a message to a socket. disconnects the socket upon failure
   function sendMessage(socket: WebSocket, message: Uint8Array, reliable: boolean) {
     if (socket.readyState === socket.OPEN) {
-      if (socket.bufferedAmount <= unreliableThreshold || reliable) {
-        socket.send(message, (err) => {
-          if (err) {
-            logger.error(err)
-            socket.terminate()
-          }
-        })
+      if ((socket.bufferedAmount <= unreliableThreshold || reliable) && !socket.isPaused) {
+        try {
+          socket.send(message, (err) => {
+            if (err) {
+              logger.error(err)
+              socket.terminate()
+            }
+          })
+        } catch (err: any) {
+          logger.error(err)
+          socket.terminate()
+        }
       } else {
         components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
       }
