@@ -38,16 +38,29 @@ let connectionCounter = 0
 export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvider'>) {
   const logger = components.logs.getLogger('uwebsocket test')
   const status = new Map<uWS.WebSocket, RoomSocket>()
-  uWS
+  const app = uWS
     .App({})
     .ws('/rooms/:roomId', {
       compression: uWS.DISABLED,
+      upgrade: (res, req, context) => {
+        const roomId = req.getParameter(0)
+        res.upgrade(
+          {
+            // NOTE: this is user data
+            url: req.getUrl(),
+            roomId
+          },
+          /* Spell these correctly */
+          req.getHeader('sec-websocket-key'),
+          req.getHeader('sec-websocket-protocol'),
+          req.getHeader('sec-websocket-extensions'),
+          context
+        )
+      },
       open: (ws) => {
-        // const roomId = req.getParameter(0)
-        logger.log('A WebSocket connected!')
+        const roomId: string = ws['roomId']
 
         const alias = ++connectionCounter
-        const roomId = '1'
         status.set(ws, { stage: Stage.INITIAL, roomId, alias })
       },
       message: (ws, message, isBinary) => {
@@ -64,8 +77,8 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
         const changeStage = (toStage: Stage) => {
           logger.debug('Stage changed', {
             address: peerStatus.address!,
-            from: peerStatus.stage,
-            to: toStage
+            from: Stage[peerStatus.stage],
+            to: Stage[toStage]
           })
           peerStatus.stage = toStage
         }
@@ -188,8 +201,7 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
           return
         }
         status.delete(ws)
-        // ws.unsubscribe(peerStatus.roomId)
-        // ws.publish(peerStatus.roomId, craftMessage({ peerLeaveMessage: { alias: peerStatus.alias } }), true)
+        app.publish(peerStatus.roomId, craftMessage({ peerLeaveMessage: { alias: peerStatus.alias } }), true)
       }
     })
     .listen(port, (token) => {
