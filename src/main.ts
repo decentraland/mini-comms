@@ -20,13 +20,18 @@ enum Stage {
   READY
 }
 
+type ByStage =
+  | {
+      stage: Stage.CHALLENGE_SENT | Stage.READY
+      challengeToSign: string
+      address: string
+    }
+  | { stage: Stage.INITIAL; challengeToSign?: string; address?: string }
+
 type RoomSocket = {
-  stage: Stage
-  challengeToSign?: string
-  address?: string
   roomId: string
   alias: number
-}
+} & ByStage
 
 let connectionCounter = 0
 
@@ -54,6 +59,15 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
         if (!peerStatus) {
           logger.log('error: no status')
           return
+        }
+
+        const changeStage = (toStage: Stage) => {
+          logger.debug('Stage changed', {
+            address: peerStatus.address!,
+            from: peerStatus.stage,
+            to: toStage
+          })
+          peerStatus.stage = toStage
         }
 
         const packet = WsPacket.decode(new Uint8Array(message))
@@ -84,36 +98,33 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
             if (sendResult !== 1) {
               logger.debug('Closing connection. Failed to send a challenge')
               ws.close()
+              return
             }
 
-            peerStatus.stage = Stage.CHALLENGE_SENT
-            logger.debug('Stage changed', {
-              stage: peerStatus.stage
-            })
+            changeStage(Stage.CHALLENGE_SENT)
             break
           }
           case Stage.CHALLENGE_SENT: {
             if (!packet.signedChallengeForServer) {
-              logger.debug('Closing connection. Signed chaallenge expected')
+              logger.debug('Closing connection. Signed challenge expected')
               ws.close()
               return
             }
 
             Authenticator.validateSignature(
-              peerStatus.challengeToSign!,
+              peerStatus.challengeToSign,
               JSON.parse(packet.signedChallengeForServer.authChainJson),
               components.ethereumProvider
             )
               .then((result) => {
                 if (result.ok) {
-                  logger.debug(`Authentication successful`, { address: peerStatus.address! })
+                  logger.debug(`Authentication successful`, { address: peerStatus.address })
 
                   const peerIdentities: Record<number, string> = {}
                   for (const peer of status.values()) {
                     if (
                       peer.address !== peerStatus.address &&
                       peer.roomId === peerStatus.roomId &&
-                      peer.address &&
                       peer.stage === Stage.READY
                     ) {
                       peerIdentities[peer.alias] = peer.address
@@ -126,15 +137,12 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
 
                   // 2. broadcast to all room that this user is joining them
                   const joinedMessage = craftMessage({
-                    peerJoinMessage: { alias: peerStatus.alias, address: peerStatus.address! }
+                    peerJoinMessage: { alias: peerStatus.alias, address: peerStatus.address }
                   })
-                  ws.publish(peerStatus.roomId, joinedMessage, true)
                   ws.subscribe(peerStatus.roomId)
+                  ws.publish(peerStatus.roomId, joinedMessage, true)
 
-                  peerStatus.stage = Stage.READY
-                  logger.debug('Stage changed', {
-                    stage: peerStatus.stage
-                  })
+                  changeStage(Stage.READY)
                 } else {
                   logger.error(`Authentication failed`, { message: result.message } as any)
                   ws.close()
