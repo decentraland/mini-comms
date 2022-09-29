@@ -168,6 +168,10 @@ export async function createRoomsComponent(
     // 0. before anything else, add the user to the room and hook the 'close' and 'message' events
     roomInstance.add(newRoomSocket)
     addressToSocket.set(newRoomSocket.address, newRoomSocket)
+    newRoomSocket.ws.on('error', (err) => {
+      logger.error(err)
+      removeFromRoom(newRoomSocket)
+    })
     newRoomSocket.ws.on('close', () => removeFromRoom(newRoomSocket))
     newRoomSocket.ws.on('message', (body) => {
       const { peerUpdateMessage } = proto.WsPacket.decode(body as any)
