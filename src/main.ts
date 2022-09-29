@@ -35,8 +35,12 @@ type WebSocket = uWS.WebSocket & {
 
 let connectionCounter = 0
 
-export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvider'>) {
-  const logger = components.logs.getLogger('uwebsocket test')
+export function runTest({
+  logs,
+  metrics,
+  ethereumProvider
+}: Pick<AppComponents, 'metrics' | 'logs' | 'ethereumProvider'>) {
+  const logger = logs.getLogger('rooms')
   const rooms = new Map<string, Set<WebSocket>>()
   const app = uWS
     .App({})
@@ -121,7 +125,7 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
             Authenticator.validateSignature(
               ws.challengeToSign,
               JSON.parse(packet.signedChallengeForServer.authChainJson),
-              components.ethereumProvider
+              ethereumProvider
             )
               .then((result) => {
                 if (result.ok) {
@@ -160,7 +164,7 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
                 }
               })
               .catch((err) => {
-                logger.debug('Authenticator errr')
+                logger.debug('Authenticator error')
                 logger.error(err)
                 ws.close()
               })
@@ -171,7 +175,7 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
             if (!packet.peerUpdateMessage) {
               // we accept unknown messages to enable protocol extensibility and compatibility.
               // do NOT kick the users when they send unknown messages
-              // components.metrics.increment('dcl_ws_rooms_unknown_sent_messages_total')
+              metrics.increment('dcl_ws_rooms_unknown_sent_messages_total')
               return
             }
 
