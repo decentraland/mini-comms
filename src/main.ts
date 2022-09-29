@@ -94,16 +94,15 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
               challengeToSign: ws.challengeToSign,
               address: ws.address
             })
-            const sendResult = ws.send(
-              craftMessage({
-                challengeMessage: {
-                  alreadyConnected: false,
-                  challengeToSign: ws.challengeToSign
-                }
-              }),
-              true
-            )
-            if (sendResult !== 1) {
+
+            const challenge = craftMessage({
+              challengeMessage: {
+                alreadyConnected: false,
+                challengeToSign: ws.challengeToSign
+              }
+            })
+
+            if (ws.send(challenge, true) !== 1) {
               logger.debug('Closing connection. Failed to send a challenge')
               ws.close()
               return
@@ -138,7 +137,11 @@ export function runTest(components: Pick<AppComponents, 'logs' | 'ethereumProvid
                   const welcomeMessage = craftMessage({
                     welcomeMessage: { alias: ws.alias, peerIdentities }
                   })
-                  ws.send(welcomeMessage, true)
+                  if (ws.send(welcomeMessage, true) !== 1) {
+                    logger.debug('Closing connection. Failed to send welcome message')
+                    ws.close()
+                    return
+                  }
 
                   // 2. broadcast to all room that this user is joining them
                   const joinedMessage = craftMessage({
