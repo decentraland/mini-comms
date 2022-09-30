@@ -7,11 +7,13 @@ import { normalizeAddress } from '../../src/logic/address'
 import { WebSocket as Ws } from 'ws'
 import { URL } from 'url'
 import { WebSocketReader } from '../../src/types'
+import { Emitter } from 'mitt'
 
-export type WebSocket = WebSocketReader & {
-  end: () => void
-  send: (message: Uint8Array, cb: (err: any) => void) => void
-}
+export type WebSocket = WebSocketReader &
+  Emitter<{ open: any }> & {
+    end: () => void
+    send: (message: Uint8Array, cb: (err: any) => void) => void
+  }
 
 test('end to end test', ({ components, spyComponents }) => {
   const aliceIdentity = createEphemeralIdentity('alice')

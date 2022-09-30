@@ -8,10 +8,16 @@ import { craftMessage } from '../logic/craft-message'
 let connectionCounter = 0
 
 export async function setupRouter({ app, components }: GlobalContext): Promise<void> {
-  const { logs, metrics } = components
+  const { logs, metrics, config } = components
   const logger = logs.getLogger('rooms')
 
+  const commitHash = await config.getString('COMMIT_HASH')
+  const status = JSON.stringify({ commitHash })
+
   app
+    .get('/status', async (res) => {
+      res.end(status)
+    })
     .get('/metrics', async (res) => {
       const body = await (metrics as any).registry.metrics()
       res.end(body)

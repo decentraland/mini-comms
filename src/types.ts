@@ -64,7 +64,6 @@ export enum Stage {
 }
 
 export type WsEvents = {
-  open: any
   message: any
   error: any
   close: any
