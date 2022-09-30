@@ -3,16 +3,53 @@ import { test } from '../components'
 import { createEphemeralIdentity } from '../helpers/identity'
 import { future } from 'fp-future'
 import { craftMessage } from '../../src/logic/craft-message'
-import { TestComponents } from '../../src/types'
 import { normalizeAddress } from '../../src/logic/address'
+import { WebSocket as Ws } from 'ws'
+import { URL } from 'url'
+import { WebSocketReader } from '../../src/types'
+
+export type WebSocket = WebSocketReader & {
+  end: () => void
+  send: (message: Uint8Array, cb: (err: any) => void) => void
+}
 
 test('end to end test', ({ components, spyComponents }) => {
   const aliceIdentity = createEphemeralIdentity('alice')
   const bobIdentity = createEphemeralIdentity('bob')
   const cloheIdentity = createEphemeralIdentity('clohe')
 
+  async function createWs(relativeUrl: string): Promise<WebSocket> {
+    const protocolHostAndProtocol = `ws://${await components.config.requireString(
+      'HTTP_SERVER_HOST'
+    )}:${await components.config.requireNumber('HTTP_SERVER_PORT')}`
+    const url = new URL(relativeUrl, protocolHostAndProtocol).toString()
+    const ws = new Ws(url) as any
+    ws.end = ws.terminate
+    return ws
+  }
+
+  async function connectSocket(identity: ReturnType<typeof createEphemeralIdentity>, room: string) {
+    const ws = await createWs('/rooms/' + room)
+    const channel = wsAsAsyncChannel(ws)
+
+    await socketConnected(ws)
+    await socketSend(ws, craftMessage({ peerIdentification: { address: identity.address } }))
+
+    // get the challenge from the server
+    const { challengeMessage } = await channel.yield(0, 'challenge message did not arrive for ' + identity.address)
+    expect(challengeMessage).not.toBeUndefined()
+
+    // sign the challenge
+    const authChainJson = JSON.stringify(await identity.sign(challengeMessage.challengeToSign))
+    await socketSend(ws, craftMessage({ signedChallengeForServer: { authChainJson } }))
+
+    // expect welcome message from server
+    const { welcomeMessage } = await channel.yield(0, 'welcome message did not arrive for ' + identity.address)
+    expect(welcomeMessage).not.toBeUndefined()
+    return Object.assign(ws, { welcomeMessage, channel, identity, challengeMessage, authChainJson })
+  }
   it('connecting one socket and sending nothing should disconnect it after one second', async () => {
-    const ws = components.createLocalWebSocket.createWs('/rooms/test')
+    const ws = await createWs('/rooms/test')
     const fut = futureWithTimeout(3000, 'The socket was not closed')
 
     ws.on('close', fut.resolve) // resolve on close
@@ -22,7 +59,7 @@ test('end to end test', ({ components, spyComponents }) => {
   })
 
   it('connecting one socket and sending noise should disconnect it immediately', async () => {
-    const ws = components.createLocalWebSocket.createWs('/rooms/test')
+    const ws = await createWs('/rooms/test')
     const fut = futureWithTimeout(3000, 'The socket was not closed')
 
     ws.on('close', fut.resolve) // resolve on close
@@ -34,13 +71,13 @@ test('end to end test', ({ components, spyComponents }) => {
   })
 
   it('connects the websocket and authenticates', async () => {
-    const ws = await connectSocket(components, aliceIdentity, 'testRoom')
+    const ws = await connectSocket(aliceIdentity, 'testRoom')
     ws.close()
   })
 
   it('connects the websocket and authenticates, doing it twice disconnects former connection', async () => {
-    const ws1 = await connectSocket(components, aliceIdentity, 'testRoom')
-    const ws2 = await connectSocket(components, aliceIdentity, 'testRoom')
+    const ws1 = await connectSocket(aliceIdentity, 'testRoom')
+    const ws2 = await connectSocket(aliceIdentity, 'testRoom')
 
     const ws1DisconnectPromise = futureWithTimeout(1000, 'Socket did not disconnect')
     ws1.on('close', ws1DisconnectPromise.resolve)
@@ -59,8 +96,8 @@ test('end to end test', ({ components, spyComponents }) => {
   })
 
   it('connects two the websocket and share messages', async () => {
-    const alice = await connectSocket(components, aliceIdentity, 'testRoom')
-    const bob = await connectSocket(components, bobIdentity, 'testRoom')
+    const alice = await connectSocket(aliceIdentity, 'testRoom')
+    const bob = await connectSocket(bobIdentity, 'testRoom')
 
     // when bob joins the room, the welcome message contains alice's information
     expect(bob.welcomeMessage.peerIdentities).toEqual({
@@ -75,7 +112,10 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // alice sends a message that needs to reach bob
-      await socketSend(alice, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]) } }))
+      await socketSend(
+        alice,
+        craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]), unreliable: false } })
+      )
       const { peerUpdateMessage } = await bob.channel.yield(1000, 'alice awaits message from bob')
       expect(peerUpdateMessage).not.toBeUndefined()
       expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([1, 2, 3]))
@@ -84,13 +124,16 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // when a new peer is connected to another room it does not ring any bell on the connected peers
-      const clohe = await connectSocket(components, cloheIdentity, 'another-room')
+      const clohe = await connectSocket(cloheIdentity, 'another-room')
       clohe.close()
     }
 
     {
       // bob sends a message that needs to reach alice
-      await socketSend(bob, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]) } }))
+      await socketSend(
+        bob,
+        craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]), unreliable: false } })
+      )
       const { peerUpdateMessage } = await alice.channel.yield(1000, 'alice awaits message from bob')
       expect(peerUpdateMessage).not.toBeUndefined()
       expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([3, 2, 3]))
@@ -99,7 +142,7 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // then clohe joins the room and leaves, sends a message and leaves
-      const clohe = await connectSocket(components, cloheIdentity, 'testRoom')
+      const clohe = await connectSocket(cloheIdentity, 'testRoom')
 
       {
         // clohe receives welcome with bob and alice
@@ -126,7 +169,10 @@ test('end to end test', ({ components, spyComponents }) => {
       }
       {
         // then send a message
-        await socketSend(clohe, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]) } }))
+        await socketSend(
+          clohe,
+          craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]), unreliable: false } })
+        )
 
         {
           // alice receives update
@@ -194,29 +240,4 @@ function futureWithTimeout<T = any>(ms: number, message = 'Timed out') {
   const t = setTimeout(() => fut.reject(new Error(message)), ms)
   fut.finally(() => clearTimeout(t))
   return fut
-}
-
-async function connectSocket(
-  components: TestComponents,
-  identity: ReturnType<typeof createEphemeralIdentity>,
-  room: string
-) {
-  const ws = components.createLocalWebSocket.createWs('/rooms/' + room)
-  const channel = wsAsAsyncChannel(ws)
-
-  await socketConnected(ws)
-  await socketSend(ws, craftMessage({ peerIdentification: { address: identity.address } }))
-
-  // get the challenge from the server
-  const { challengeMessage } = await channel.yield(0, 'challenge message did not arrive for ' + identity.address)
-  expect(challengeMessage).not.toBeUndefined()
-
-  // sign the challenge
-  const authChainJson = JSON.stringify(await identity.sign(challengeMessage.challengeToSign))
-  await socketSend(ws, craftMessage({ signedChallengeForServer: { authChainJson } }))
-
-  // expect welcome message from server
-  const { welcomeMessage } = await channel.yield(0, 'welcome message did not arrive for ' + identity.address)
-  expect(welcomeMessage).not.toBeUndefined()
-  return Object.assign(ws, { welcomeMessage, channel, identity, challengeMessage, authChainJson })
 }

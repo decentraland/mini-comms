@@ -43,11 +43,6 @@ export type AppComponents = BaseComponents & {}
 export type TestComponents = BaseComponents & {
   // A fetch component that only hits the test server
   localFetch: IFetchComponent
-  createLocalWebSocket: IWsTestComponent
-}
-
-export type IWsTestComponent = {
-  createWs(relativeUrl: string): WebSocket
 }
 
 // this type simplifies the typings of http handlers
@@ -69,13 +64,16 @@ export enum Stage {
 }
 
 export type WsEvents = {
-  message: Buffer
+  open: any
+  message: any
   error: any
   close: any
 }
 
-export type WebSocket = Pick<uWS.WebSocket, 'subscribe' | 'end' | 'close'> &
-  Emitter<WsEvents> & {
+export type WebSocketReader = Pick<uWS.WebSocket, 'end' | 'close'> & Emitter<WsEvents>
+
+export type WebSocket = Pick<uWS.WebSocket, 'subscribe'> &
+  WebSocketReader & {
     stage: Stage
     roomId: string
     address?: string
