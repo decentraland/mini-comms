@@ -129,10 +129,13 @@ export async function createRoomsComponent(
         }
       }
     } else {
-      const result = socket.send(message, true)
-      if (result !== 1) {
-        logger.error(`cannot send message ${result}`)
-        socket.close()
+      if (socket.getBufferedAmount() <= unreliableThreshold || reliable) {
+        const result = socket.send(message, true)
+        if (result !== 1) {
+          socket.close()
+        }
+      } else {
+        components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
       }
     }
   }
