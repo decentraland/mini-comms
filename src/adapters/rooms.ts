@@ -1,31 +1,18 @@
-import { Writer } from 'protobufjs/minimal'
-import * as proto from '../proto/ws-comms-rfc-5'
-import { AppComponents } from '../types'
+import { WebSocket, AppComponents } from '../types'
 import { validateMetricsDeclaration } from '@well-known-components/metrics'
-import { WebSocket } from 'uWebSockets.js'
 
 export type RoomComponent = {
-  addSocketToRoom(ws: WebSocket, address: string, room: string): void
+  addSocketToRoom(ws: WebSocket, address: string): void
+  removeFromRoom(ws: WebSocket): void
   isAddressConnected(address: string): boolean
-  onClose(address: string): void
-  onMessage(address: string, body: any): void
-}
-
-export type RoomSocket = {
-  ws: WebSocket
-  address: string
-  alias: number
-  room: string
+  getSocket(address: string): WebSocket | undefined
+  getRoom(room: string): Set<WebSocket>
 }
 
 export const roomsMetrics = validateMetricsDeclaration({
   dcl_ws_rooms_count: {
     help: 'Current amount of rooms',
     type: 'gauge'
-  },
-  dcl_ws_rooms_sent_messages_total: {
-    help: 'Amount of user sent messages',
-    type: 'counter'
   },
   dcl_ws_rooms_connections: {
     help: 'Current amount of connections',
@@ -45,27 +32,17 @@ export const roomsMetrics = validateMetricsDeclaration({
   }
 })
 
-// we use a shared writer to reduce allocations and leverage its allocation pool
-const writer = new Writer()
-export function craftMessage(packet: Partial<proto.WsPacket>): Uint8Array {
-  writer.reset()
-  proto.WsPacket.encode(packet as any, writer)
-  return writer.finish()
-}
-
 export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'metrics'>): RoomComponent {
-  const rooms = new Map<string, Set<RoomSocket>>()
-  const addressToSocket = new Map<string, RoomSocket>()
+  const rooms = new Map<string, Set<WebSocket>>()
+  const addressToSocket = new Map<string, WebSocket>()
   const logger = components.logs.getLogger('RoomsComponent')
 
-  let connectionCounter = 0
-
   // gets or creates a room
-  function getRoom(room: string) {
+  function getRoom(room: string): Set<WebSocket> {
     let r = rooms.get(room)
     if (!r) {
       logger.debug('Creating room', { room })
-      r = new Set()
+      r = new Set<WebSocket>()
       rooms.set(room, r)
     }
     observeRoomCount()
@@ -82,120 +59,51 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
   // Removes a socket from a room in the data structure and also forwards the
   // message to the rest of the room.
   // Deletes the room if it becomes empty
-  function removeFromRoom(roomSocket: RoomSocket) {
-    const roomInstance = getRoom(roomSocket.room)
+  function removeFromRoom(socket: WebSocket) {
+    const roomInstance = getRoom(socket.roomId)
     logger.debug('Disconnecting user', {
-      room: roomSocket.room,
-      address: roomSocket.address,
-      alias: roomSocket.alias,
+      room: socket.roomId,
+      address: socket.address!,
+      alias: socket.alias,
       count: addressToSocket.size
     })
-    roomInstance.delete(roomSocket)
-    addressToSocket.delete(roomSocket.address)
+    roomInstance.delete(socket)
+    if (socket.address) {
+      addressToSocket.delete(socket.address)
+    }
     if (roomInstance.size === 0) {
-      logger.debug('Destroying room', { room: roomSocket.room, count: rooms.size })
-      rooms.delete(roomSocket.room)
+      logger.debug('Destroying room', { room: socket.roomId, count: rooms.size })
+      rooms.delete(socket.roomId)
       observeRoomCount()
-    } else {
-      broadcastToRoom(roomInstance, craftMessage({ peerLeaveMessage: { alias: roomSocket.alias } }), roomSocket)
     }
     observeConnectionCount()
-  }
-
-  // simply sends a message to a socket. disconnects the socket upon failure
-  function sendMessage(socket: WebSocket, message: Uint8Array) {
-    const result = socket.send(message, true)
-    if (result !== 1) {
-      logger.error(`cannot send message ${result}`)
-      socket.close()
-    }
-  }
-
-  // broadcasts a message to a room. optionally it can skip one socket
-  function broadcastToRoom(roomSockets: Set<RoomSocket>, message: Uint8Array, excludePeer: RoomSocket) {
-    for (const peer of roomSockets) {
-      if (peer === excludePeer) continue
-      sendMessage(peer.ws, message)
-    }
   }
 
   // receives an authenticated socket and adds it to a room
-  function addSocketToRoom(ws: WebSocket, address: string, room: string) {
-    const alias = ++connectionCounter
-    const newRoomSocket: RoomSocket = {
-      ws,
-      alias,
-      address,
-      room
-    }
-    logger.debug('Connecting user', { room, address, alias })
+  function addSocketToRoom(ws: WebSocket, address: string) {
+    logger.debug('Connecting user', { room: ws.roomId, address, alias: ws.alias })
 
-    // disconnect previous session
-    const kicked = addressToSocket.get(newRoomSocket.address)
+    const roomInstance = getRoom(ws.roomId)
 
-    if (kicked) {
-      logger.info('Kicking user', { room, address, alias: kicked.alias })
-      sendMessage(kicked.ws, craftMessage({ peerKicked: {} }))
-      kicked.ws.close()
-      removeFromRoom(kicked)
-      logger.info('Kicked user', { room, address, alias: kicked.alias })
-      components.metrics.increment('dcl_ws_rooms_kicks_total')
-    }
-
-    const roomInstance = getRoom(room)
     // 0. before anything else, add the user to the room and hook the 'close' and 'message' events
-    roomInstance.add(newRoomSocket)
-    addressToSocket.set(newRoomSocket.address, newRoomSocket)
+    roomInstance.add(ws)
+    addressToSocket.set(address, ws)
     observeConnectionCount()
-
-    // 1. tell the user about their identity and the neighbouring peers,
-    //    and disconnect other peers if the address is repeated
-    const peerIdentities: Record<number, string> = {}
-    for (const peer of roomInstance) {
-      if (peer.address !== newRoomSocket.address) {
-        peerIdentities[peer.alias] = peer.address
-      }
-    }
-    const welcomeMessage = craftMessage({ welcomeMessage: { alias: newRoomSocket.alias, peerIdentities } })
-    console.log('SENDING WELCOME')
-    sendMessage(ws, welcomeMessage)
-
-    // 2. broadcast to all room that this user is joining them
-    const joinedMessage = craftMessage({
-      peerJoinMessage: { alias: newRoomSocket.alias, address: newRoomSocket.address }
-    })
-    broadcastToRoom(roomInstance, joinedMessage, newRoomSocket)
-
-    components.metrics.increment('dcl_ws_rooms_connections_total')
   }
 
   function isAddressConnected(address: string): boolean {
     return addressToSocket.has(address)
   }
 
-  function onClose(address: string) {
-    const roomSocket = addressToSocket.get(address)!
-    removeFromRoom(roomSocket)
-  }
-
-  function onMessage(address: string, peerUpdateMessage: proto.WsPeerUpdate) {
-    const roomSocket = addressToSocket.get(address)!
-    peerUpdateMessage.fromAlias = roomSocket.alias
-    const roomInstance = getRoom(roomSocket.room)
-    broadcastToRoom(
-      roomInstance,
-      craftMessage({
-        peerUpdateMessage
-      }),
-      roomSocket
-    )
-    components.metrics.increment('dcl_ws_rooms_sent_messages_total')
+  function getSocket(address: string): WebSocket | undefined {
+    return addressToSocket.get(address)
   }
 
   return {
+    getRoom,
     addSocketToRoom,
     isAddressConnected,
-    onClose,
-    onMessage
+    getSocket,
+    removeFromRoom
   }
 }

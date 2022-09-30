@@ -9,10 +9,11 @@ import type {
 import { metricDeclarations } from './metrics'
 import { HTTPProvider } from 'eth-connect'
 import { RoomComponent } from './adapters/rooms'
-import { TemplatedApp, WebSocket } from 'uWebSockets.js'
+import * as uWS from 'uWebSockets.js'
+import { Emitter } from 'mitt'
 
 export type GlobalContext = {
-  app: TemplatedApp
+  app: uWS.TemplatedApp
   components: BaseComponents
 }
 
@@ -46,7 +47,7 @@ export type TestComponents = BaseComponents & {
 }
 
 export type IWsTestComponent = {
-  createWs(relativeUrl: string): WebSocket
+  createWs(relativeUrl: string): uWS.WebSocket
 }
 
 // this type simplifies the typings of http handlers
@@ -61,3 +62,26 @@ export type HandlerContextWithPath<
 >
 
 export type Context<Path extends string = any> = IHttpServerComponent.PathAwareContext<GlobalContext, Path>
+
+export enum Stage {
+  LINEAR,
+  READY
+}
+
+export type WsEvents = {
+  message: Buffer
+  error: any
+  close: any
+}
+
+export type WebSocket = Pick<uWS.WebSocket, 'subscribe' | 'end' | 'close'> &
+  Emitter<WsEvents> & {
+    stage: Stage
+    roomId: string
+    address?: string
+    alias: number
+
+    // NOTE(hugo): I prefer to override this ones to make isBinary not default
+    send: (data: Uint8Array, isBinary: boolean) => number
+    publish: (topic: string, data: Uint8Array, isBinary: boolean) => number
+  }
