@@ -201,7 +201,6 @@ export async function setupRouter({ app, components }: GlobalContext): Promise<v
       },
       close: (_ws) => {
         logger.log('WS closed')
-        metrics.decrement('dcl_ws_rooms_connections_total')
         observeRoomCount()
 
         const ws = _ws as any as WebSocket
