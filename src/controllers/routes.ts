@@ -192,8 +192,18 @@ export async function setupRouter({ app, components }: GlobalContext): Promise<v
               return
             }
 
-            packet.peerUpdateMessage.fromAlias = ws.alias
-            ws.publish(ws.roomId, craftMessage({ peerUpdateMessage: packet.peerUpdateMessage }), true)
+            const { body, unreliable } = packet.peerUpdateMessage
+            ws.publish(
+              ws.roomId,
+              craftMessage({
+                peerUpdateMessage: {
+                  fromAlias: ws.alias,
+                  body,
+                  unreliable
+                }
+              }),
+              true
+            )
 
             break
           }
