@@ -2,13 +2,12 @@ import { Writer } from 'protobufjs/minimal'
 import * as proto from '../proto/ws-comms-rfc-5'
 import { AppComponents } from '../types'
 import { validateMetricsDeclaration } from '@well-known-components/metrics'
-import { WebSocket } from 'uWebSockets.js'
+import { WebSocket as uWebSocket } from 'uWebSockets.js'
+import { WebSocket } from 'ws'
 
 export type RoomComponent = {
-  addSocketToRoom(ws: WebSocket, address: string, room: string): void
+  addSocketToRoom(ws: WebSocket | uWebSocket, address: string, room: string): void
   isAddressConnected(address: string): boolean
-  onClose(address: string): void
-  onMessage(address: string, body: any): void
 }
 
 export type RoomSocket = {
@@ -17,7 +16,9 @@ export type RoomSocket = {
   alias: number
   room: string
 }
-
+export function isWs(x: any): x is WebSocket {
+  return 'terminate' in x
+}
 export const roomsMetrics = validateMetricsDeclaration({
   dcl_ws_rooms_count: {
     help: 'Current amount of rooms',
@@ -42,6 +43,10 @@ export const roomsMetrics = validateMetricsDeclaration({
   dcl_ws_rooms_unknown_sent_messages_total: {
     help: 'Total amount of unkown messages',
     type: 'counter'
+  },
+  dcl_ws_rooms_dropped_unreliable_messages_total: {
+    help: 'Total amount of dropped unreliable messages',
+    type: 'counter'
   }
 })
 
@@ -53,10 +58,13 @@ export function craftMessage(packet: Partial<proto.WsPacket>): Uint8Array {
   return writer.finish()
 }
 
-export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'metrics'>): RoomComponent {
+export async function createRoomsComponent(
+  components: Pick<AppComponents, 'logs' | 'metrics' | 'config'>
+): Promise<RoomComponent> {
   const rooms = new Map<string, Set<RoomSocket>>()
   const addressToSocket = new Map<string, RoomSocket>()
   const logger = components.logs.getLogger('RoomsComponent')
+  const unreliableThreshold = (await components.config.getNumber('WS_MAX_BUFFERED_AMOUNT')) || 0
 
   let connectionCounter = 0
 
@@ -97,25 +105,48 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
       rooms.delete(roomSocket.room)
       observeRoomCount()
     } else {
-      broadcastToRoom(roomInstance, craftMessage({ peerLeaveMessage: { alias: roomSocket.alias } }), roomSocket)
+      broadcastToRoom(roomInstance, craftMessage({ peerLeaveMessage: { alias: roomSocket.alias } }), roomSocket, true)
     }
     observeConnectionCount()
   }
 
+
+
   // simply sends a message to a socket. disconnects the socket upon failure
-  function sendMessage(socket: WebSocket, message: Uint8Array) {
-    const result = socket.send(message, true)
-    if (result !== 1) {
-      logger.error(`cannot send message ${result}`)
-      socket.close()
+  function sendMessage(socket: WebSocket | uWebSocket, message: Uint8Array, reliable: boolean) {
+    if (isWs(socket)) {
+      if ((socket.bufferedAmount <= unreliableThreshold || reliable) && !socket.isPaused) {
+        try {
+          socket.send(message, (err) => {
+            if (err) {
+              socket.terminate()
+            }
+          })
+        } catch (err: any) {
+          socket.terminate()
+        }
+      } else {
+        components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
+      }
+    } else {
+      const result = socket.send(message, true)
+      if (result !== 1) {
+        logger.error(`cannot send message ${result}`)
+        socket.close()
+      }
     }
   }
 
   // broadcasts a message to a room. optionally it can skip one socket
-  function broadcastToRoom(roomSockets: Set<RoomSocket>, message: Uint8Array, excludePeer: RoomSocket) {
+  function broadcastToRoom(
+    roomSockets: Set<RoomSocket>,
+    message: Uint8Array,
+    excludePeer: RoomSocket,
+    reliable: boolean
+  ) {
     for (const peer of roomSockets) {
       if (peer === excludePeer) continue
-      sendMessage(peer.ws, message)
+      sendMessage(peer.ws, message, reliable)
     }
   }
 
@@ -135,7 +166,7 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
 
     if (kicked) {
       logger.info('Kicking user', { room, address, alias: kicked.alias })
-      sendMessage(kicked.ws, craftMessage({ peerKicked: {} }))
+      sendMessage(kicked.ws, craftMessage({ peerKicked: {} }), true)
       kicked.ws.close()
       removeFromRoom(kicked)
       logger.info('Kicked user', { room, address, alias: kicked.alias })
@@ -146,6 +177,34 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
     // 0. before anything else, add the user to the room and hook the 'close' and 'message' events
     roomInstance.add(newRoomSocket)
     addressToSocket.set(newRoomSocket.address, newRoomSocket)
+    newRoomSocket.ws.on('error', (err) => {
+      logger.error(err)
+      removeFromRoom(newRoomSocket)
+    })
+    newRoomSocket.ws.on('close', () => removeFromRoom(newRoomSocket))
+    newRoomSocket.ws.on('message', (body) => {
+      const { peerUpdateMessage } = proto.WsPacket.decode(body as any)
+      if (peerUpdateMessage) {
+        broadcastToRoom(
+          roomInstance,
+          craftMessage({
+            peerUpdateMessage: {
+              fromAlias: newRoomSocket.alias,
+              body: peerUpdateMessage.body,
+              unreliable: peerUpdateMessage.unreliable
+            }
+          }),
+          newRoomSocket,
+          !peerUpdateMessage.unreliable
+        )
+        components.metrics.increment('dcl_ws_rooms_sent_messages_total')
+      } else {
+        // we accept unknown messages to enable protocol extensibility and compatibility.
+        // do NOT kick the users when they send unknown messages
+        components.metrics.increment('dcl_ws_rooms_unknown_sent_messages_total')
+      }
+    })
+
     observeConnectionCount()
 
     // 1. tell the user about their identity and the neighbouring peers,
@@ -157,14 +216,13 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
       }
     }
     const welcomeMessage = craftMessage({ welcomeMessage: { alias: newRoomSocket.alias, peerIdentities } })
-    console.log('SENDING WELCOME')
-    sendMessage(ws, welcomeMessage)
+    sendMessage(ws, welcomeMessage, true)
 
     // 2. broadcast to all room that this user is joining them
     const joinedMessage = craftMessage({
       peerJoinMessage: { alias: newRoomSocket.alias, address: newRoomSocket.address }
     })
-    broadcastToRoom(roomInstance, joinedMessage, newRoomSocket)
+    broadcastToRoom(roomInstance, joinedMessage, newRoomSocket, true)
 
     components.metrics.increment('dcl_ws_rooms_connections_total')
   }
@@ -173,29 +231,8 @@ export function createRoomsComponent(components: Pick<AppComponents, 'logs' | 'm
     return addressToSocket.has(address)
   }
 
-  function onClose(address: string) {
-    const roomSocket = addressToSocket.get(address)!
-    removeFromRoom(roomSocket)
-  }
-
-  function onMessage(address: string, peerUpdateMessage: proto.WsPeerUpdate) {
-    const roomSocket = addressToSocket.get(address)!
-    peerUpdateMessage.fromAlias = roomSocket.alias
-    const roomInstance = getRoom(roomSocket.room)
-    broadcastToRoom(
-      roomInstance,
-      craftMessage({
-        peerUpdateMessage
-      }),
-      roomSocket
-    )
-    components.metrics.increment('dcl_ws_rooms_sent_messages_total')
-  }
-
   return {
     addSocketToRoom,
-    isAddressConnected,
-    onClose,
-    onMessage
+    isAddressConnected
   }
 }

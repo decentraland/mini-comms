@@ -9,7 +9,8 @@ import type {
 import { metricDeclarations } from './metrics'
 import { HTTPProvider } from 'eth-connect'
 import { RoomComponent } from './adapters/rooms'
-import { TemplatedApp, WebSocket } from 'uWebSockets.js'
+import { TemplatedApp } from 'uWebSockets.js'
+import { WebSocket } from 'ws'
 
 export type GlobalContext = {
   app: TemplatedApp
