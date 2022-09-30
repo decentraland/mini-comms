@@ -47,7 +47,7 @@ export type TestComponents = BaseComponents & {
 }
 
 export type IWsTestComponent = {
-  createWs(relativeUrl: string): uWS.WebSocket
+  createWs(relativeUrl: string): WebSocket
 }
 
 // this type simplifies the typings of http handlers

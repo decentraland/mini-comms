@@ -1,23 +1,15 @@
 import { GlobalContext, WebSocket, Stage } from '../types'
 import { WsPacket } from '../proto/ws-comms-rfc-5'
-import { Writer } from 'protobufjs/minimal'
 import * as uWS from 'uWebSockets.js'
 import { handleSocketLinearProtocol } from '../logic/handle-linear-protocol'
 import mitt from 'mitt'
-
-const writer = new Writer()
-export function craftMessage(packet: Partial<WsPacket>): Uint8Array {
-  writer.reset()
-  WsPacket.encode(packet as any, writer)
-  return writer.finish()
-}
+import { craftMessage } from '../logic/craft-message'
 
 let connectionCounter = 0
 
 export async function setupRouter({ app, components }: GlobalContext): Promise<void> {
   const { logs, metrics } = components
   const logger = logs.getLogger('rooms')
-  const rooms = new Map<string, Set<WebSocket>>()
 
   app
     .get('/metrics', async (res) => {

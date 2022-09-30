@@ -3,16 +3,7 @@ import { AppComponents, WebSocket } from '../types'
 import { Authenticator } from '@dcl/crypto'
 import { wsAsAsyncChannel } from './ws-as-async-channel'
 import { normalizeAddress } from './address'
-import { Writer } from 'protobufjs/minimal'
-import * as proto from '../proto/ws-comms-rfc-5'
-
-// we use a shared writer to reduce allocations and leverage its allocation pool
-const writer = new Writer()
-export function craftMessage(packet: Partial<proto.WsPacket>): Uint8Array {
-  writer.reset()
-  proto.WsPacket.encode(packet as any, writer)
-  return writer.finish()
-}
+import { craftMessage } from './craft-message'
 
 export async function handleSocketLinearProtocol(
   { rooms, logs, ethereumProvider, metrics }: Pick<AppComponents, 'rooms' | 'logs' | 'ethereumProvider' | 'metrics'>,
