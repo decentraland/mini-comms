@@ -12,7 +12,7 @@ export async function main(program: Lifecycle.EntryPointParameters<AppComponents
 
   const app = uWS.App({})
 
-  setupRouter({ app, components })
+  await setupRouter({ app, components })
   const port = await components.config.requireNumber('HTTP_SERVER_PORT')
   const logger = components.logs.getLogger('server')
   app.listen(port, (token) => {

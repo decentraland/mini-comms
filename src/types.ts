@@ -3,7 +3,6 @@ import type {
   IConfigComponent,
   ILoggerComponent,
   IHttpServerComponent,
-  IBaseComponent,
   IMetricsComponent
 } from '@well-known-components/interfaces'
 import { metricDeclarations } from './metrics'
@@ -18,8 +17,6 @@ export type GlobalContext = {
 }
 
 export type RpcContext = GlobalContext
-
-export type WebSocketComponent = IBaseComponent & {}
 
 // components used in every environment
 export type BaseComponents = {
@@ -37,7 +34,7 @@ export type Channel<T> = {
 }
 
 // components used in runtime
-export type AppComponents = BaseComponents & {}
+export type AppComponents = BaseComponents
 
 // components used in tests
 export type TestComponents = BaseComponents & {
