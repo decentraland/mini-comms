@@ -130,10 +130,7 @@ export async function createRoomsComponent(
       }
     } else {
       if (socket.getBufferedAmount() <= unreliableThreshold || reliable) {
-        const result = socket.send(message, true)
-        if (result !== 1) {
-          socket.close()
-        }
+        socket.send(message, true)
       } else {
         components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
       }
