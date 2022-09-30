@@ -47,7 +47,6 @@ export async function handleSocketLinearProtocol(
     socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }), (err) => {
       if (err) {
         logger.error(err)
-        console.error(err)
         socket.terminate()
         channel.close()
       }

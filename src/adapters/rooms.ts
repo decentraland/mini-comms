@@ -114,12 +114,10 @@ export async function createRoomsComponent(
         try {
           socket.send(message, (err) => {
             if (err) {
-              logger.error(err)
               socket.terminate()
             }
           })
         } catch (err: any) {
-          logger.error(err)
           socket.terminate()
         }
       } else {
