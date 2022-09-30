@@ -51,7 +51,6 @@ export async function setupRouter({ app, components }: GlobalContext): Promise<v
         ws.emit('open', { })
       },
       message: (_ws, message, isBinary) => {
-        console.dir({fromClient: Buffer.from(message)})
         _ws.emit('message', Buffer.from(message))
       },
       close: (_ws) => {

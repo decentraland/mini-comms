@@ -212,7 +212,6 @@ async function connectSocket(
   room: string
 ) {
   const ws = components.createLocalWebSocket.createWs('/rooms/' + room)
-  ws.on('message', ($) => console.dir({ fromServer: $ }))
   const channel = wsAsAsyncChannel(ws)
 
   await socketConnected(ws)
