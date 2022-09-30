@@ -46,10 +46,15 @@ export async function handleSocketLinearProtocol(
     if (socket.readyState !== WebSocket.OPEN) throw new Error('Connection lost')
 
     /// 2. send the challenge back to the client
-    if(isWs(socket))
-    socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }) )
-    else
-    socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }) ,true)
+    if (isWs(socket))
+      socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }), (err) => {
+        if (err) {
+          logger.error(err)
+          socket.terminate()
+          channel.close()
+        }
+      })
+    else socket.send(craftMessage({ challengeMessage: { alreadyConnected, challengeToSign } }), true)
 
     /// 3. wait for the confirmation message
     const { signedChallengeForServer } = await channel.yield(1000, 'Timed out waiting for signed challenge response')

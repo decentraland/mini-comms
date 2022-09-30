@@ -110,23 +110,23 @@ export async function createRoomsComponent(
     observeConnectionCount()
   }
 
-
-
   // simply sends a message to a socket. disconnects the socket upon failure
   function sendMessage(socket: WebSocket | uWebSocket, message: Uint8Array, reliable: boolean) {
     if (isWs(socket)) {
-      if ((socket.bufferedAmount <= unreliableThreshold || reliable) && !socket.isPaused) {
-        try {
-          socket.send(message, (err) => {
-            if (err) {
-              socket.terminate()
-            }
-          })
-        } catch (err: any) {
-          socket.terminate()
+      if (socket.readyState === WebSocket.OPEN) {
+        if ((socket.bufferedAmount <= unreliableThreshold || reliable) && !socket.isPaused) {
+          try {
+            socket.send(message, (err) => {
+              if (err) {
+                socket.terminate()
+              }
+            })
+          } catch (err: any) {
+            socket.terminate()
+          }
+        } else {
+          components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
         }
-      } else {
-        components.metrics.increment('dcl_ws_rooms_dropped_unreliable_messages_total')
       }
     } else {
       const result = socket.send(message, true)
