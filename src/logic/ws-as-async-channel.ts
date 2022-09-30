@@ -16,7 +16,8 @@ export function wsAsAsyncChannel(socket: WebSocket | uWebSocket) {
       channel.enqueue(WsPacket.decode(data))
     } catch (error) {
       socket.emit('error', error)
-      socket.terminate()
+      if ('terminate' in socket) socket.terminate()
+      else socket.end()
     }
   }
   function closeChannel() {

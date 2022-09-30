@@ -4,7 +4,7 @@ import { createEphemeralIdentity } from '../helpers/identity'
 import { future } from 'fp-future'
 import { WebSocket } from 'ws'
 import { WebSocket as uWebSocket } from 'uWebSockets.js'
-import { craftMessage } from '../../src/adapters/rooms'
+import { craftMessage, isWs } from '../../src/adapters/rooms'
 import { TestComponents } from '../../src/types'
 import { normalizeAddress } from '../../src/logic/address'
 
@@ -77,7 +77,10 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // alice sends a message that needs to reach bob
-      await socketSend(alice, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]), unreliable: false } }))
+      await socketSend(
+        alice,
+        craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]), unreliable: false } })
+      )
       const { peerUpdateMessage } = await bob.channel.yield(1000, 'alice awaits message from bob')
       expect(peerUpdateMessage).not.toBeUndefined()
       expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([1, 2, 3]))
@@ -92,7 +95,10 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // bob sends a message that needs to reach alice
-      await socketSend(bob, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]), unreliable: false } }))
+      await socketSend(
+        bob,
+        craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]), unreliable: false } })
+      )
       const { peerUpdateMessage } = await alice.channel.yield(1000, 'alice awaits message from bob')
       expect(peerUpdateMessage).not.toBeUndefined()
       expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([3, 2, 3]))
@@ -128,7 +134,10 @@ test('end to end test', ({ components, spyComponents }) => {
       }
       {
         // then send a message
-        await socketSend(clohe, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]), unreliable: false } }))
+        await socketSend(
+          clohe,
+          craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]), unreliable: false } })
+        )
 
         {
           // alice receives update
@@ -180,13 +189,15 @@ test('end to end test', ({ components, spyComponents }) => {
   })
 })
 
-function socketConnected(socket: WebSocket|uWebSocket): Promise<void> {
-  return new Promise((res) => socket.on('open', res))
+function socketConnected(socket: WebSocket | uWebSocket): Promise<void> {
+  if (socket.readyState !== WebSocket.OPEN) return new Promise((res) => socket.on('open', res))
 }
-function socketSend(socket: WebSocket|uWebSocket, message: Uint8Array): Promise<void> {
-  return new Promise((res, rej) => {
-    socket.send(message)
-  })
+function socketSend(socket: WebSocket | uWebSocket, message: Uint8Array): Promise<void> {
+  if (isWs(socket))
+    return new Promise((res, rej) => {
+      socket.send(message, (e) => (e ? rej(e) : res()))
+    })
+  else if (socket.send(message, true) != 1) throw new Error('Error while sending')
 }
 function futureWithTimeout<T = any>(ms: number, message = 'Timed out') {
   const fut = future<T>()
@@ -201,7 +212,7 @@ async function connectSocket(
   room: string
 ) {
   const ws = components.createLocalWebSocket.createWs('/rooms/' + room)
-  ws.on('message', $=> console.dir({fromServer: $}))
+  ws.on('message', ($) => console.dir({ fromServer: $ }))
   const channel = wsAsAsyncChannel(ws)
 
   await socketConnected(ws)

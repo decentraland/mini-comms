@@ -43,7 +43,9 @@ export async function setupRouter({ app, components }: GlobalContext): Promise<v
       open: (ws) => {
         handleSocketLinearProtocol(components, ws, ws.roomId).catch((err) => {
           logger.error(err)
-          ws.end()
+          try {
+          ws.close()
+          } catch {}
         })
         ws.readyState = WebSocket.OPEN
         ws.emit('open', { })
