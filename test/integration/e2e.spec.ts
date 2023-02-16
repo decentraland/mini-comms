@@ -49,8 +49,8 @@ test('end to end test', ({ components, spyComponents }) => {
     // connect ws2 should say "alreadyConnected=true"
     expect(ws2.challengeMessage.alreadyConnected).toEqual(true)
 
-    const { peerKicked } = await ws1.channel.yield(100, 'wait for kicked message')
-    expect(peerKicked).not.toBeUndefined()
+    const packet = await ws1.channel.yield(100, 'wait for kicked message')
+    expect(packet.message.$case).toEqual('peerKicked')
 
     // await for disconnection of ws1
     await ws1DisconnectPromise
@@ -59,28 +59,45 @@ test('end to end test', ({ components, spyComponents }) => {
     ws2.close()
   })
 
-  it('connects two the websocket and share messages', async () => {
+  it('connects two websockets and share messages', async () => {
     const alice = await connectSocket(components, aliceIdentity, 'testRoom')
     const bob = await connectSocket(components, bobIdentity, 'testRoom')
 
     // when bob joins the room, the welcome message contains alice's information
-    expect(bob.welcomeMessage.peerIdentities).toEqual({
+    expect(bob.welcomeMessage.peerIdentities).toMatchObject({
       [alice.welcomeMessage.alias]: normalizeAddress(alice.identity.address)
     })
 
     // when bob connects alice receives peerJoinMessage
-    const { peerJoinMessage } = await alice.channel.yield(1000, 'when bob connects alice receives peerJoinMessage')
-    expect(peerJoinMessage).not.toBeUndefined()
-    expect(peerJoinMessage.address).toEqual(normalizeAddress(bob.identity.address))
-    expect(peerJoinMessage.alias).toEqual(bob.welcomeMessage.alias)
+    let packet = await alice.channel.yield(1000, 'when bob connects alice receives peerJoinMessage')
+    expect(packet.message).toMatchObject({
+      $case: 'peerJoinMessage',
+      peerJoinMessage: {
+        address: normalizeAddress(bob.identity.address),
+        alias: bob.welcomeMessage.alias
+      }
+    })
 
     {
       // alice sends a message that needs to reach bob
-      await socketSend(alice, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]), unreliable: false } }))
-      const { peerUpdateMessage } = await bob.channel.yield(1000, 'alice awaits message from bob')
-      expect(peerUpdateMessage).not.toBeUndefined()
-      expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([1, 2, 3]))
-      expect(peerUpdateMessage.fromAlias).toEqual(alice.welcomeMessage.alias)
+      await socketSend(
+        alice,
+        craftMessage({
+          message: {
+            $case: 'peerUpdateMessage',
+            peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([1, 2, 3]), unreliable: false }
+          }
+        })
+      )
+      packet = await bob.channel.yield(1000, 'alice awaits message from bob')
+      expect(packet.message).toMatchObject({
+        $case: 'peerUpdateMessage',
+        peerUpdateMessage: {
+          fromAlias: alice.welcomeMessage.alias,
+          body: Uint8Array.from([1, 2, 3]),
+          unreliable: false
+        }
+      })
     }
 
     {
@@ -91,11 +108,28 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // bob sends a message that needs to reach alice
-      await socketSend(bob, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([3, 2, 3]), unreliable: false } }))
-      const { peerUpdateMessage } = await alice.channel.yield(1000, 'alice awaits message from bob')
-      expect(peerUpdateMessage).not.toBeUndefined()
-      expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([3, 2, 3]))
-      expect(peerUpdateMessage.fromAlias).toEqual(bob.welcomeMessage.alias)
+      await socketSend(
+        bob,
+        craftMessage({
+          message: {
+            $case: 'peerUpdateMessage',
+            peerUpdateMessage: {
+              fromAlias: 0,
+              body: Uint8Array.from([3, 2, 3]),
+              unreliable: false
+            }
+          }
+        })
+      )
+      packet = await alice.channel.yield(1000, 'alice awaits message from bob')
+      expect(packet.message).toMatchObject({
+        $case: 'peerUpdateMessage',
+        peerUpdateMessage: {
+          fromAlias: bob.welcomeMessage.alias,
+          body: Uint8Array.from([3, 2, 3]),
+          unreliable: false
+        }
+      })
     }
 
     {
@@ -104,7 +138,7 @@ test('end to end test', ({ components, spyComponents }) => {
 
       {
         // clohe receives welcome with bob and alice
-        expect(clohe.welcomeMessage.peerIdentities).toEqual({
+        expect(clohe.welcomeMessage.peerIdentities).toMatchObject({
           [alice.welcomeMessage.alias]: normalizeAddress(alice.identity.address),
           [bob.welcomeMessage.alias]: normalizeAddress(bob.identity.address)
         })
@@ -112,37 +146,67 @@ test('end to end test', ({ components, spyComponents }) => {
 
       {
         // alice receives peerJoinMessage
-        const { peerJoinMessage } = await alice.channel.yield(1000, 'alice receives peerJoinMessage')
-        expect(peerJoinMessage).not.toBeUndefined()
-        expect(peerJoinMessage.address).toEqual(normalizeAddress(clohe.identity.address))
-        expect(peerJoinMessage.alias).toEqual(clohe.welcomeMessage.alias)
+        packet = await alice.channel.yield(1000, 'alice receives peerJoinMessage')
+        expect(packet.message).toMatchObject({
+          $case: 'peerJoinMessage',
+          peerJoinMessage: {
+            address: normalizeAddress(clohe.identity.address),
+            alias: clohe.welcomeMessage.alias
+          }
+        })
       }
 
       {
         // bob receives peerJoinMessage
-        const { peerJoinMessage } = await bob.channel.yield(1000, 'bob receives peerJoinMessage')
-        expect(peerJoinMessage).not.toBeUndefined()
-        expect(peerJoinMessage.address).toEqual(normalizeAddress(clohe.identity.address))
-        expect(peerJoinMessage.alias).toEqual(clohe.welcomeMessage.alias)
+        packet = await bob.channel.yield(1000, 'bob receives peerJoinMessage')
+        expect(packet.message).toMatchObject({
+          $case: 'peerJoinMessage',
+          peerJoinMessage: {
+            address: normalizeAddress(clohe.identity.address),
+            alias: clohe.welcomeMessage.alias
+          }
+        })
       }
       {
         // then send a message
-        await socketSend(clohe, craftMessage({ peerUpdateMessage: { fromAlias: 0, body: Uint8Array.from([6]), unreliable: false } }))
+        await socketSend(
+          clohe,
+          craftMessage({
+            message: {
+              $case: 'peerUpdateMessage',
+              peerUpdateMessage: {
+                fromAlias: 0,
+                body: Uint8Array.from([6]),
+                unreliable: false
+              }
+            }
+          })
+        )
 
         {
           // alice receives update
-          const { peerUpdateMessage } = await alice.channel.yield(1000, 'alice receives update')
-          expect(peerUpdateMessage).not.toBeUndefined()
-          expect(peerUpdateMessage.fromAlias).toEqual(clohe.welcomeMessage.alias)
-          expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([6]))
+          packet = await alice.channel.yield(1000, 'alice receives update')
+          expect(packet.message).toMatchObject({
+            $case: 'peerUpdateMessage',
+            peerUpdateMessage: {
+              fromAlias: clohe.welcomeMessage.alias,
+              body: Uint8Array.from([6]),
+              unreliable: false
+            }
+          })
         }
 
         {
           // bob receives update
-          const { peerUpdateMessage } = await bob.channel.yield(1000, 'bob receives update')
-          expect(peerUpdateMessage).not.toBeUndefined()
-          expect(peerUpdateMessage.fromAlias).toEqual(clohe.welcomeMessage.alias)
-          expect(Uint8Array.from(peerUpdateMessage.body)).toEqual(Uint8Array.from([6]))
+          packet = await bob.channel.yield(1000, 'bob receives update')
+          expect(packet.message).toMatchObject({
+            $case: 'peerUpdateMessage',
+            peerUpdateMessage: {
+              fromAlias: clohe.welcomeMessage.alias,
+              body: Uint8Array.from([6]),
+              unreliable: false
+            }
+          })
         }
       }
       {
@@ -151,16 +215,24 @@ test('end to end test', ({ components, spyComponents }) => {
 
         {
           // alice receives leave
-          const { peerLeaveMessage } = await alice.channel.yield(1000, 'alice receives leave')
-          expect(peerLeaveMessage).not.toBeUndefined()
-          expect(peerLeaveMessage.alias).toEqual(clohe.welcomeMessage.alias)
+          packet = await alice.channel.yield(1000, 'alice receives leave')
+          expect(packet.message).toMatchObject({
+            $case: 'peerLeaveMessage',
+            peerLeaveMessage: {
+              alias: clohe.welcomeMessage.alias
+            }
+          })
         }
 
         {
           // bob receives leave
-          const { peerLeaveMessage } = await bob.channel.yield(1000, 'bob receives leave')
-          expect(peerLeaveMessage).not.toBeUndefined()
-          expect(peerLeaveMessage.alias).toEqual(clohe.welcomeMessage.alias)
+          packet = await bob.channel.yield(1000, 'bob receives leave')
+          expect(packet.message).toMatchObject({
+            $case: 'peerLeaveMessage',
+            peerLeaveMessage: {
+              alias: clohe.welcomeMessage.alias
+            }
+          })
         }
       }
     }
@@ -170,9 +242,13 @@ test('end to end test', ({ components, spyComponents }) => {
 
     {
       // bob receives leave
-      const { peerLeaveMessage } = await bob.channel.yield(1000, 'bob receives leave 2')
-      expect(peerLeaveMessage).not.toBeUndefined()
-      expect(peerLeaveMessage.alias).toEqual(alice.welcomeMessage.alias)
+      packet = await bob.channel.yield(1000, 'bob receives leave 2')
+      expect(packet.message).toMatchObject({
+        $case: 'peerLeaveMessage',
+        peerLeaveMessage: {
+          alias: alice.welcomeMessage.alias
+        }
+      })
     }
 
     bob.close()
@@ -206,18 +282,18 @@ async function connectSocket(
   const channel = wsAsAsyncChannel(ws)
 
   await socketConnected(ws)
-  await socketSend(ws, craftMessage({ peerIdentification: { address: identity.address } }))
+  await socketSend(ws, craftMessage({ message: { $case: 'peerIdentification', peerIdentification: { address: identity.address } } }))
 
   // get the challenge from the server
-  const { challengeMessage } = await channel.yield(0, 'challenge message did not arrive for ' + identity.address)
-  expect(challengeMessage).not.toBeUndefined()
+  const challengeMessage = await channel.yield(0, 'challenge message did not arrive for ' + identity.address)
+  if (challengeMessage.message.$case !== 'challengeMessage') throw new Error('challengeMessage not received, got ' + challengeMessage.message.$case)
 
   // sign the challenge
-  const authChainJson = JSON.stringify(await identity.sign(challengeMessage.challengeToSign))
-  await socketSend(ws, craftMessage({ signedChallengeForServer: { authChainJson } }))
+  const authChainJson = JSON.stringify(await identity.sign(challengeMessage.message.challengeMessage.challengeToSign))
+  await socketSend(ws, craftMessage({ message: { $case: 'signedChallengeForServer', signedChallengeForServer: { authChainJson } } }))
 
   // expect welcome message from server
-  const { welcomeMessage } = await channel.yield(0, 'welcome message did not arrive for ' + identity.address)
-  expect(welcomeMessage).not.toBeUndefined()
-  return Object.assign(ws, { welcomeMessage, channel, identity, challengeMessage, authChainJson })
+  const welcomeMessage = await channel.yield(0, 'welcome message did not arrive for ' + identity.address)
+  if (welcomeMessage.message.$case !== 'welcomeMessage') throw new Error('welcomeMessage not received, got ' + welcomeMessage.message.$case)
+  return Object.assign(ws, { welcomeMessage: welcomeMessage.message.welcomeMessage, channel, identity, challengeMessage: challengeMessage.message.challengeMessage, authChainJson })
 }

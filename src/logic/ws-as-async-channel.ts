@@ -1,6 +1,6 @@
 import { AsyncQueue } from '@dcl/rpc/dist/push-channel'
 import { WebSocket } from 'ws'
-import { WsPacket } from '../proto/ws-comms-rfc-5'
+import { WsPacket } from '@dcl/protocol/out-js/decentraland/kernel/comms/rfc5/ws_comms.gen'
 
 export function wsAsAsyncChannel(socket: WebSocket) {
   // Wire the socket to a pushable channel
@@ -12,7 +12,7 @@ export function wsAsAsyncChannel(socket: WebSocket) {
   })
   function processMessage(data: Buffer) {
     try {
-      channel.enqueue(WsPacket.decode(data))
+      channel.enqueue(WsPacket.decode(new Uint8Array(data)))
     } catch (error) {
       socket.emit('error', error)
       socket.terminate()
