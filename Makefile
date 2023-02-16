@@ -6,6 +6,9 @@ ifneq ($(CI), true)
 LOCAL_ARG = --local --verbose --diagnostics
 endif
 
+install:
+	npm ci
+
 test: build
 	touch .env
 	node_modules/.bin/jest --forceExit --detectOpenHandles --coverage --verbose $(TESTARGS)
