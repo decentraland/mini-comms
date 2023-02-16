@@ -9,7 +9,6 @@
   "devDependencies": {
     "@dcl/eslint-config": "^1.1.0",
     "@types/node": "^18.0.4",
-    "@types/ws": "^8.5.3",
     "@well-known-components/test-helpers": "^1.4.0",
     "eth-crypto": "^2.5.0",
     "ethereum-cryptography": "^1.1.2",
@@ -29,6 +28,7 @@
     "@dcl/protocol": "^1.0.0-4177500465.commit-247c87f",
     "@dcl/rpc": "^1.1.1",
     "@dcl/schemas": "^6.10.0",
+    "@types/ws": "^8.5.3",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/http-server": "^2.0.0-20230216161243.commit-bfe3f0a",
     "@well-known-components/interfaces": "^1.2.0",
