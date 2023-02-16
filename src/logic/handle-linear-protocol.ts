@@ -1,4 +1,4 @@
-import { EthAddress } from '@dcl/schemas/dist/schemas'
+import { EthAddress } from '@dcl/schemas'
 import { WebSocket } from 'ws'
 import { craftMessage } from '../adapters/rooms'
 import { AppComponents } from '../types'
