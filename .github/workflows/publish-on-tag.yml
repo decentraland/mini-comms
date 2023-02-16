@@ -24,6 +24,8 @@ jobs:
         run:  make lint
       - name: build
         run:  make build test
+      - name: remove server dependencies
+        run:  make remove-deps
       - name: Publish
         uses: menduz/oddish-action@master
         with:

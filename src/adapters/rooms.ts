@@ -1,5 +1,5 @@
 import { Writer } from 'protobufjs/minimal'
-import * as proto from '../proto/ws-comms-rfc-5'
+import * as proto from '@dcl/protocol/out-js/decentraland/kernel/comms/rfc5/ws_comms.gen'
 import { WebSocket } from 'ws'
 import { AppComponents } from '../types'
 import { validateMetricsDeclaration } from '@well-known-components/metrics'
@@ -102,7 +102,12 @@ export async function createRoomsComponent(
       rooms.delete(roomSocket.room)
       observeRoomCount()
     } else {
-      broadcastToRoom(roomInstance, craftMessage({ peerLeaveMessage: { alias: roomSocket.alias } }), roomSocket, true)
+      broadcastToRoom(
+        roomInstance,
+        craftMessage({ message: { $case: 'peerLeaveMessage', peerLeaveMessage: { alias: roomSocket.alias } } }),
+        roomSocket,
+        true
+      )
     }
     observeConnectionCount()
   }
@@ -155,7 +160,11 @@ export async function createRoomsComponent(
 
     if (kicked) {
       logger.info('Kicking user', { room, address, alias: kicked.alias })
-      sendMessage(kicked.ws, craftMessage({ peerKicked: {} }), true)
+      sendMessage(
+        kicked.ws,
+        craftMessage({ message: { $case: 'peerKicked', peerKicked: { reason: 'Already logged in' } } }),
+        true
+      )
       kicked.ws.close()
       removeFromRoom(kicked)
       logger.info('Kicked user', { room, address, alias: kicked.alias })
@@ -172,19 +181,22 @@ export async function createRoomsComponent(
     })
     newRoomSocket.ws.on('close', () => removeFromRoom(newRoomSocket))
     newRoomSocket.ws.on('message', (body) => {
-      const { peerUpdateMessage } = proto.WsPacket.decode(body as any)
-      if (peerUpdateMessage) {
+      const msg = proto.WsPacket.decode(body as any)
+      if (msg.message?.$case === 'peerUpdateMessage') {
         broadcastToRoom(
           roomInstance,
           craftMessage({
-            peerUpdateMessage: {
-              fromAlias: newRoomSocket.alias,
-              body: peerUpdateMessage.body,
-              unreliable: peerUpdateMessage.unreliable
+            message: {
+              $case: 'peerUpdateMessage',
+              peerUpdateMessage: {
+                fromAlias: newRoomSocket.alias,
+                body: msg.message.peerUpdateMessage.body,
+                unreliable: msg.message.peerUpdateMessage.unreliable
+              }
             }
           }),
           newRoomSocket,
-          !peerUpdateMessage.unreliable
+          !msg.message.peerUpdateMessage.unreliable
         )
         components.metrics.increment('dcl_ws_rooms_sent_messages_total')
       } else {
@@ -204,12 +216,20 @@ export async function createRoomsComponent(
         peerIdentities[peer.alias] = peer.address
       }
     }
-    const welcomeMessage = craftMessage({ welcomeMessage: { alias: newRoomSocket.alias, peerIdentities } })
+    const welcomeMessage = craftMessage({
+      message: {
+        $case: 'welcomeMessage',
+        welcomeMessage: { alias: newRoomSocket.alias, peerIdentities }
+      }
+    })
     sendMessage(ws, welcomeMessage, true)
 
     // 2. broadcast to all room that this user is joining them
     const joinedMessage = craftMessage({
-      peerJoinMessage: { alias: newRoomSocket.alias, address: newRoomSocket.address }
+      message: {
+        $case: 'peerJoinMessage',
+        peerJoinMessage: { alias: newRoomSocket.alias, address: newRoomSocket.address }
+      }
     })
     broadcastToRoom(roomInstance, joinedMessage, newRoomSocket, true)
 
