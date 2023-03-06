@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "@dcl/crypto": "^3.3.1",
-    "@dcl/protocol": "^1.0.0-4177500465.commit-247c87f",
+    "@dcl/protocol": "^1.0.0-4316765690.commit-d0a21d7",
     "@dcl/rpc": "^1.1.1",
     "@dcl/schemas": "^6.10.0",
     "@types/ws": "^8.5.3",
