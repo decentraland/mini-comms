@@ -27,7 +27,7 @@
     "@dcl/crypto": "^3.3.1",
     "@dcl/protocol": "^1.0.0-4177500465.commit-247c87f",
     "@dcl/rpc": "^1.1.1",
-    "@dcl/schemas": "^6.10.0",
+    "@dcl/schemas": "^6.11.1",
     "@types/ws": "^8.5.3",
     "@well-known-components/env-config-provider": "^1.2.0",
     "@well-known-components/http-server": "^2.0.0-20230216161243.commit-bfe3f0a",
